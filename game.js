@@ -19,11 +19,17 @@ const touchEl = document.getElementById('touch');
 const I18N = {
   ja: {
     gameTitle: '格闘カマキリ', logo: '格闘<span>カマキリ</span>', subtitle: 'KAKUTO KAMAKIRI — 3D', langBtn: 'English',
-    start: '勝ち抜きバトル スタート', cont: 'つづきから（STAGE {n}：{name}）',
+    start: 'プレイ', cont: 'つづきから（STAGE {n}：{name}）', howto: 'あそびかた',
+    rules: '各ステージ2本先取。6匹のカマキリを勝ち抜くとクリア！',
+    best: 'ベスト：STAGE {n} までクリア', bestAll: 'ベスト：全ステージ制覇！👑',
+    privacy: 'プライバシーポリシー', privacyUrl: 'https://techgym.jp/privacy-policy/', adSettings: '広告の設定',
+    redoTitle: '負けたラウンドをやり直す？', redoWatch: '▶ 広告を見てやり直す', redoLoading: '広告を読み込み中…',
+    redoNext: 'このまま進む（{s}）', redoNote: 'あと {n} 回使えます（1ゲーム {max} 回まで）', redoFail: '広告を読み込めませんでした',
+    redoUsed: '（やり直し {n} 回）',
     lead: '6匹のカマキリが順番に登場。勝つほど相手が強くなる！',
     cMove: '移動', cJump: 'ジャンプ', cGuard: 'ガード', cLight: 'カマジャブ（弱）', cHeavy: '大鎌斬り（強）', cSpecial: '旋風鎌（必殺）',
     kbNote: '空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。',
-    touchNote: '左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。',
+    touchNote: '左のパッドで移動（上下にずらすとジャンプ／ガード）。<br>「ジャンプ」「ガード」「弱」（カマジャブ）「強」（大鎌斬り）「必」（旋風鎌）のボタンで戦います。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動し、光っているときに使えます。',
     bLight: '弱<small>カマジャブ</small>', bHeavy: '強<small>大鎌斬り</small>', bSp: '必<small>旋風鎌</small>',
     resume: '再開', retry: '最初からやり直す', toTitle: 'タイトルへ', share: '結果をシェア',
     aPause: '一時停止', aMute: '音のオン/オフ', aFull: '全画面',
@@ -39,11 +45,17 @@ const I18N = {
   },
   en: {
     gameTitle: 'Kakuto Kamakiri', logo: 'KAKUTO <span>KAMAKIRI</span>', subtitle: 'MANTIS FIGHTING — 3D', langBtn: '日本語',
-    start: 'START ARCADE BATTLE', cont: 'CONTINUE (STAGE {n}: {name})',
+    start: 'PLAY', cont: 'CONTINUE (STAGE {n}: {name})', howto: 'HOW TO PLAY',
+    rules: 'Win 2 rounds to clear each stage. Defeat all six mantises to win!',
+    best: 'Best: cleared up to Stage {n}', bestAll: 'Best: ALL STAGES CLEARED! 👑',
+    privacy: 'Privacy Policy', privacyUrl: 'https://techgym.jp/privacy-policy-en/', adSettings: 'Ad settings',
+    redoTitle: 'Retry the round you lost?', redoWatch: '▶ Watch an ad to retry', redoLoading: 'Loading ad...',
+    redoNext: 'Continue ({s})', redoNote: '{n} left (up to {max} per game)', redoFail: 'Could not load an ad',
+    redoUsed: ' ({n} retries)',
     lead: 'Six mantises await, one after another — each stronger than the last!',
     cMove: 'Move', cJump: 'Jump', cGuard: 'Guard', cLight: 'Scythe Jab (light)', cHeavy: 'Great Slash (heavy)', cSpecial: 'Whirlwind Scythe (special)',
     kbNote: 'Attack in midair for a Dive Scythe. The special costs 50 spirit. P / Esc to pause, M to mute.',
-    touchNote: 'Move with the left pad (slide up/down to jump/guard) and attack with the right buttons.<br>Press Jab or Slash in midair for a Dive Scythe. SP fires at 50 spirit.<br>Landscape mode is recommended.',
+    touchNote: 'Move with the left pad (slide up/down to jump/guard).<br>Fight with the Jump, Guard, L (Jab), H (Slash) and SP (Whirlwind) buttons.<br>Press L or H in midair for a Dive Scythe. SP fires at 50 spirit and glows when ready.',
     bLight: 'L<small>Jab</small>', bHeavy: 'H<small>Slash</small>', bSp: 'SP<small>Whirlwind</small>',
     resume: 'Resume', retry: 'Restart Stage', toTitle: 'Title Screen', share: 'Share Result',
     aPause: 'Pause', aMute: 'Sound on/off', aFull: 'Fullscreen',
@@ -66,6 +78,10 @@ function T(key, vars) {
   if (vars) for (const [k, v] of Object.entries(vars)) str = str.split(`{${k}}`).join(String(v));
   return str;
 }
+// Android アプリ（Capacitor）で動いているか。Web 版では Capacitor がないので何もしない
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const plugin = name => (NATIVE && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
+const Ads = window.Ads || { available: false, canReward: false, showing: false, privacyOptionsRequired: false, initDone: Promise.resolve(), showInterstitial: async () => {}, showRewarded: async () => 'unavailable', setBanner() {}, showPrivacyOptions: async () => {} };
 const nm = sp => (lang === 'en' ? sp.en : sp.name);
 const dsc = sp => (lang === 'en' ? sp.descEn : sp.desc);
 
@@ -125,6 +141,11 @@ function noise(dur, vol = 0.2, freq = 2000, q = 1) {
   const g = a.createGain(); g.gain.value = vol;
   src.connect(f).connect(g).connect(a.destination); src.start();
 }
+// 広告の表示中やアプリが裏に回ったときに音を止める（ads.js からも呼ばれる）
+window.Sound = {
+  suspend() { if (actx && actx.state === 'running') actx.suspend(); },
+  resume() { if (actx && !document.hidden) actx.resume(); },
+};
 const sfx = {
   swing() { noise(0.09, 0.12, 3500, 0.8); },
   hit() { noise(0.12, 0.45, 1400); tone(160, 0.1, 'sawtooth', 0.12, -90); },
@@ -1042,9 +1063,26 @@ fsBtn.addEventListener('click', async () => {
     }
   } catch (e) { /* 非対応端末は無視 */ }
 });
-document.getElementById('resumeBtn').addEventListener('click', () => { sfx.select(); setPaused(false); });
-document.getElementById('retryBtn').addEventListener('click', () => { sfx.select(); setPaused(false); startStage(game.stage); });
-document.getElementById('pauseTitleBtn').addEventListener('click', () => { sfx.select(); setPaused(false); toTitle(); });
+if (NATIVE) fsBtn.style.display = 'none'; // アプリは最初から全画面
+
+// ---------- 全画面広告（アプリのみ） ----------
+// プレイ開始・タイトルへ戻る・ポーズからの再開・結果画面からの「次へ／もう一度」のたびに出す
+let adBusy = false;
+async function withInterstitial(next) {
+  if (adBusy) return;
+  if (Ads.available) {
+    adBusy = true;
+    for (const el of document.querySelectorAll('.overlay')) el.classList.add('ad-wait');
+    await Ads.showInterstitial(3000);
+    for (const el of document.querySelectorAll('.overlay')) el.classList.remove('ad-wait');
+    adBusy = false;
+  }
+  next();
+}
+function resumeFromPause() { pauseEl.classList.add('hidden'); withInterstitial(() => setPaused(false)); }
+document.getElementById('resumeBtn').addEventListener('click', () => { sfx.select(); resumeFromPause(); });
+document.getElementById('retryBtn').addEventListener('click', () => { sfx.select(); withInterstitial(() => { setPaused(false); startStage(game.stage); }); });
+document.getElementById('pauseTitleBtn').addEventListener('click', () => { sfx.select(); withInterstitial(() => { setPaused(false); toTitle(); }); });
 
 // ============================================================
 //  技データ（フレーム@60fps、距離はワールド単位）
@@ -1261,6 +1299,9 @@ function startStage(n) {
 }
 function startRound() {
   if (camFx) { camFx = null; camBlend = 45; }
+  closeRedo();
+  // ラウンド開始時の状態（リワード広告でやり直すときに戻す）
+  game.roundStart = { wins: [...game.wins], round: game.round, en: fighters.map(f => f.en) };
   game.cine = 0;
   fighters[0].reset(-2.6, 1, false); fighters[1].reset(2.6, -1, false);
   game.timer = 99 * 60; game.phase = 'intro'; game.phaseT = 0; game.winner = -1; game.slow = 0; game.paused = false;
@@ -1270,6 +1311,8 @@ function startRound() {
 }
 function toTitle() {
   game.mode = 'title'; game.sound = false; game.paused = false;
+  howtoEl.classList.add('hidden');
+  updateBest();
   titleEl.classList.remove('hidden'); resultEl.classList.add('hidden'); touchEl.classList.add('hidden');
   pauseEl.classList.add('hidden'); sysEl.classList.add('hidden');
   fighters[0].setSpecies(PLAYER_SP);
@@ -1293,14 +1336,30 @@ function showResult(title, sub, btnLabel, action) {
   againAction = action;
   resultEl.classList.remove('hidden'); touchEl.classList.add('hidden'); sysEl.classList.add('hidden');
 }
-document.getElementById('startBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(0); });
-document.getElementById('continueBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(loadProgress()); });
-againBtn.addEventListener('click', () => { audio(); sfx.select(); if (againAction) againAction(); });
-document.getElementById('titleBtn').addEventListener('click', () => { sfx.select(); toTitle(); });
+// 1 ゲーム（タイトルから始めて、全制覇かタイトルに戻るまで）の開始
+function newRun(n) { game.redoUsed = 0; startStage(n); }
+const howtoEl = document.getElementById('howtoScreen');
+document.getElementById('startBtn').addEventListener('click', () => { audio(); sfx.select(); withInterstitial(() => newRun(0)); });
+document.getElementById('continueBtn').addEventListener('click', () => { audio(); sfx.select(); withInterstitial(() => newRun(loadProgress())); });
+document.getElementById('howtoBtn').addEventListener('click', () => { audio(); sfx.select(); titleEl.classList.add('hidden'); howtoEl.classList.remove('hidden'); });
+document.getElementById('howtoPlayBtn').addEventListener('click', () => { audio(); sfx.select(); withInterstitial(() => { howtoEl.classList.add('hidden'); newRun(0); }); });
+document.getElementById('howtoBackBtn').addEventListener('click', () => { sfx.select(); withInterstitial(toTitle); });
+againBtn.addEventListener('click', () => { audio(); sfx.select(); if (againAction) withInterstitial(againAction); });
+document.getElementById('titleBtn').addEventListener('click', () => { sfx.select(); withInterstitial(toTitle); });
+
+// ベスト記録（何ステージまでクリアしたか）
+const BEST_KEY = 'kamakiri.best';
+function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (e) { return 0; } }
+function saveBest(n) { try { if (n > loadBest()) localStorage.setItem(BEST_KEY, String(n)); } catch (e) { /* 無視 */ } }
+function updateBest() {
+  const b = loadBest();
+  document.getElementById('bestRecord').textContent = b >= ROSTER.length ? T('bestAll') : b > 0 ? T('best', { n: b }) : '';
+}
 
 function finishMatch(mw) {
   game.mode = 'result'; game.msg = ''; game.sub = '';
   const n = game.stage;
+  if (mw === 0) saveBest(n + 1);
   if (mw === 0) {
     if (n >= ROSTER.length - 1) {
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 無視 */ }
@@ -1318,6 +1377,12 @@ function finishMatch(mw) {
     playMusic('gameover');
     game.shareText = T('shareLose', { n: n + 1, name: nm(ROSTER[n]) });
     showResult(mw < 0 ? T('draw') : T('gameover'), T('stageOf', { n: n + 1, name: nm(ROSTER[n]) }), T('continue'), () => startStage(n));
+  }
+  // リワード広告でやり直した回数は、結果画面とシェア文に出す
+  if (game.redoUsed > 0) {
+    const r = T('redoUsed', { n: game.redoUsed });
+    game.shareText += r;
+    const sm = resultText.querySelector('small'); if (sm) sm.textContent += r;
   }
 }
 
@@ -1400,6 +1465,11 @@ function step() {
     return;
   }
   if (game.paused) return;
+  if (game.redoHold) { // やり直しの案内を出している間は先へ進めない
+    for (const f of fighters) f.update(NEUTRAL, game.ctrls[f.idx], fighters[1 - f.idx]);
+    updateRedo();
+    return;
+  }
   if (game.cine > 0) { // 必殺技の演出中：技を出した側だけ構えを取る
     game.cine--;
     const f = game.cineF;
@@ -1449,6 +1519,8 @@ function step() {
       if (w >= 0) game.wins[w]++;
       game.msg = w < 0 ? 'DRAW' : w === 0 ? T('youWin') : T('winsMsg', { name: nm(fighters[w].sp) });
     }
+    // 負けたラウンドは、負けた様子を見届けてから「広告を見てやり直す」を出す（アプリのみ）
+    if (game.phaseT === 150 && w === 1 && game.mode === 'match') offerRedo();
     if (game.phaseT === 200) {
       if (game.wins[0] >= 2 || game.wins[1] >= 2 || game.round >= 5) {
         const mw = game.wins[0] === game.wins[1] ? -1 : game.wins[0] > game.wins[1] ? 0 : 1;
@@ -1651,6 +1723,8 @@ function applyLang() {
   document.getElementById('langBtn').textContent = T('langBtn');
   const saved = loadProgress();
   document.getElementById('continueBtn').textContent = T('cont', { n: saved + 1, name: nm(ROSTER[saved]) });
+  document.getElementById('privacyLink').href = T('privacyUrl');
+  updateBest();
 }
 document.getElementById('langBtn').addEventListener('click', () => {
   audio(); sfx.select();
@@ -1669,6 +1743,12 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
   const url = SHARE_URL;
   const text = `${game.shareText || T('gameTitle')} ${T('hashtag')}`;
   shareMsg.textContent = '';
+  // アプリでは Android の共有メニューを出す
+  const nativeShare = plugin('Share');
+  if (nativeShare) {
+    try { await nativeShare.share({ title: T('gameTitle'), text, url, dialogTitle: T('share') }); } catch (e) { /* キャンセル */ }
+    return;
+  }
   // スマホなどOSの共有機能が使える場合はそれを使う
   if (navigator.share) {
     try { await navigator.share({ title: T('gameTitle'), text, url }); return; }
@@ -1683,6 +1763,87 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 });
 
 // ============================================================
+//  リワード広告のチート：負けたラウンドをやり直す（アプリのみ・1 ゲーム 3 回まで）
+// ============================================================
+const REDO_MAX = 3, REDO_WAIT = 6 * 60;
+const redoEl = document.getElementById('redo');
+const redoWatch = document.getElementById('redoWatch'), redoNext = document.getElementById('redoNext'), redoNote = document.getElementById('redoNote');
+game.redoUsed = 0;
+function offerRedo() {
+  if (!Ads.canReward || game.redoUsed >= REDO_MAX) return;
+  game.redoHold = true; game.redoT = REDO_WAIT; game.redoBusy = false;
+  redoWatch.disabled = false; redoWatch.textContent = T('redoWatch');
+  redoNote.textContent = T('redoNote', { n: REDO_MAX - game.redoUsed, max: REDO_MAX });
+  redoEl.classList.remove('hidden');
+  touchEl.classList.add('hidden');
+  keys.clear();
+}
+function closeRedo() {
+  game.redoHold = false;
+  redoEl.classList.add('hidden');
+  if (game.mode === 'match' && isTouch) touchEl.classList.remove('hidden');
+}
+function updateRedo() {
+  if (game.redoBusy) return;
+  game.redoT--;
+  redoNext.textContent = T('redoNext', { s: Math.max(0, Math.ceil(game.redoT / 60)) });
+  if (game.redoT <= 0) closeRedo();
+}
+redoNext.addEventListener('click', () => { sfx.select(); closeRedo(); });
+redoWatch.addEventListener('click', async () => {
+  if (!game.redoHold || game.redoBusy) return;
+  game.redoBusy = true;
+  redoWatch.disabled = true; redoWatch.textContent = T('redoLoading');
+  const result = await Ads.showRewarded();
+  if (result === 'unavailable') {
+    redoNote.textContent = T('redoFail');
+    setTimeout(closeRedo, 2000);
+    return;
+  }
+  closeRedo();
+  if (result !== 'rewarded') return; // 最後まで見なかったときは何もせず先へ
+  // 負けたラウンドを取り消して、同じラウンドをもう一度
+  game.redoUsed++;
+  const rs = game.roundStart;
+  game.wins = [...rs.wins]; game.round = rs.round;
+  startRound();
+  fighters.forEach((f, i) => { f.en = rs.en[i]; });
+  game.msg = '';
+});
+
+// ============================================================
+//  アプリ（Android）向けの処理
+// ============================================================
+// バナー広告：トップ・あそびかた・ポーズ・結果画面だけ（プレイ中は操作ボタンと重なるので出さない）
+function updateBanner() {
+  Ads.setBanner(!adBusy && (game.mode === 'title' || game.mode === 'result' || game.paused));
+}
+// Android の戻るボタン：プレイ中はポーズ（ポーズ中なら再開）、トップと結果画面ではアプリを閉じる
+if (plugin('App')) {
+  plugin('App').addListener('backButton', () => {
+    if (adBusy) return;
+    if (game.redoHold) { closeRedo(); return; }
+    if (!howtoEl.classList.contains('hidden')) { withInterstitial(toTitle); return; }
+    if (game.mode === 'title' || game.mode === 'result') { plugin('App').exitApp(); return; }
+    if (game.paused) resumeFromPause(); else setPaused(true);
+  });
+}
+// 別のアプリに切り替えたら自動でポーズし、音も止める（広告の表示中は広告側が音を止めている）
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (game.mode === 'match' && !game.redoHold) setPaused(true);
+    keys.clear();
+    window.Sound.suspend();
+  } else if (!Ads.showing) {
+    window.Sound.resume();
+  }
+});
+// トップ画面の下：バージョン（アプリ版）・プライバシーポリシー・広告の設定（EU など）
+if (window.APP_VERSION && window.APP_VERSION !== 'dev') document.getElementById('buildInfo').textContent = window.APP_VERSION;
+Ads.initDone.then(() => { if (Ads.privacyOptionsRequired) document.getElementById('adPrivacy').classList.remove('hidden'); });
+document.getElementById('adPrivacyLink').addEventListener('click', e => { e.preventDefault(); Ads.showPrivacyOptions(); });
+
+// ============================================================
 //  メインループ
 // ============================================================
 applyLang();
@@ -1695,9 +1856,12 @@ function frame(now) {
   updateCamera(simTime);
   renderer.render(scene, camera);
   drawHUD();
+  updateBanner();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-// デバッグ用
-window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime, step, AIController };
+// web-only:start
+// テスト・検証用（アプリ用のビルドでは取り除く）
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime, step, AIController, camera, renderer, scene };
+// web-only:end

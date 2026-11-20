@@ -23,16 +23,28 @@
       </div>
     </div>
 
-    <!-- タイトル -->
+    <!-- タイトル（トップ） -->
     <div id="title" class="overlay">
       <button id="langBtn" class="lang">English</button>
       <h1 data-i18n-html="logo">格闘<span>カマキリ</span></h1>
       <p class="sub" data-i18n="subtitle">KAKUTO KAMAKIRI — 3D</p>
-      <div class="menu">
-        <button id="startBtn" class="primary" data-i18n="start">勝ち抜きバトル スタート</button>
-        <button id="continueBtn" class="hidden">つづきから</button>
-      </div>
       <p class="lead" data-i18n="lead">6匹のカマキリが順番に登場。勝つほど相手が強くなる！</p>
+      <p id="bestRecord" class="best"></p>
+      <div class="menu">
+        <button id="startBtn" class="primary" data-i18n="start">プレイ</button>
+        <button id="continueBtn" class="hidden">つづきから</button>
+        <button id="howtoBtn" data-i18n="howto">あそびかた</button>
+      </div>
+      <div id="legal">
+        <span id="buildInfo"></span>
+        <a id="privacyLink" href="https://techgym.jp/privacy-policy/" target="_blank" rel="noopener" data-i18n="privacy">プライバシーポリシー</a>
+        <span id="adPrivacy" class="hidden">| <a href="#" id="adPrivacyLink" data-i18n="adSettings">広告の設定</a></span>
+      </div>
+    </div>
+
+    <!-- あそびかた -->
+    <div id="howtoScreen" class="overlay hidden">
+      <h2 data-i18n="howto">あそびかた</h2>
       <div class="howto keyboard-only">
         <table>
           <tr><td data-i18n="cMove">移動</td><td>A / D（← / →）</td></tr>
@@ -45,8 +57,21 @@
         <p data-i18n="kbNote">空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。</p>
       </div>
       <div class="howto touch-only">
-        <p data-i18n-html="touchNote">左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。</p>
+        <p data-i18n-html="touchNote">左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。</p>
       </div>
+      <p class="howto" data-i18n="rules">各ステージ2本先取。全6ステージを勝ち抜くとクリア！</p>
+      <div class="menu">
+        <button id="howtoPlayBtn" class="primary" data-i18n="start">プレイ</button>
+        <button id="howtoBackBtn" data-i18n="toTitle">タイトルへ</button>
+      </div>
+    </div>
+
+    <!-- リワード広告：負けたラウンドのやり直し（アプリのみ） -->
+    <div id="redo" class="hidden">
+      <p id="redoTitle" data-i18n="redoTitle">このラウンドをやり直す？</p>
+      <button id="redoWatch" class="primary">広告を見てやり直す</button>
+      <button id="redoNext">このまま進む</button>
+      <small id="redoNote"></small>
     </div>
 
     <!-- 一時停止 -->
@@ -89,6 +114,9 @@
     </div>
 
   </div>
+  <script src="ads-config.js"></script>
+  <script src="build-info.js"></script>
+  <script src="ads.js"></script>
   <script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
   <script type="module" src="game.js"></script>
 </body>

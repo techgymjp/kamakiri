@@ -163,3 +163,33 @@ h2 small { display: block; font-size: clamp(14px, 2.6vw, 22px); margin-top: 12px
 .lang:hover { background: rgba(60,90,30,.7); }
 .menu button.share { background: #12324a; border-color: #6ec2ff; }
 .menu button.share:hover { background: #1d4a6c; }
+
+/* トップ画面 */
+.best { margin: 4px 0 14px; color: #ffd84d; font-weight: bold; font-size: 15px; text-shadow: 0 1px 2px #000; min-height: 1em; }
+#title .lead { margin: 0 0 6px; font-size: 16px; }
+#legal { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); font-size: 12px; color: #cfe3b8; opacity: .85; text-align: left; }
+#legal a { color: #cfe3b8; }
+#legal #buildInfo:not(:empty)::after { content: ' | '; }
+#howtoScreen .howto { margin-top: 0; margin-bottom: 14px; font-size: 14px; }
+#howtoScreen h2 { font-size: clamp(28px, 6vw, 48px); margin-bottom: 14px; }
+
+/* リワード広告の案内 */
+#redo {
+  position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%);
+  z-index: 8; width: min(360px, 90vw);
+  display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  padding: 14px 16px; border-radius: 14px;
+  background: rgba(10, 18, 6, .92); border: 2px solid #ffcf4d; text-align: center;
+}
+#redo p { margin: 0 0 4px; font-weight: bold; font-size: 17px; }
+#redo button { font: inherit; font-weight: bold; padding: 10px; border-radius: 10px; border: 2px solid #6fa83a; background: #1c2c10; color: #fff; cursor: pointer; }
+#redo button.primary { background: #c98a12; border-color: #ffcf4d; }
+#redo button:disabled { opacity: .6; }
+#redo small { color: #cfe3b8; font-size: 12px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .best { margin-bottom: 8px; }
+  #title .lead { font-size: 13px; }
+  #howtoScreen .howto { font-size: 12px; margin-bottom: 8px; }
+  #howtoScreen h2 { margin-bottom: 6px; }
+}
+.overlay.ad-wait { pointer-events: none; }

@@ -60,8 +60,50 @@ python3 -m http.server 8000
 
 - `index.html` … 画面・メニュー
 - `style.css` … スタイル
-- `game.js` … 3Dモデル、戦闘ロジック、CPU AI、エフェクト、HUD
+- `game.js` … 3Dモデル、戦闘ロジック、CPU AI、BGM、エフェクト、HUD、アプリ向けの処理
+- `ads.js` … Google AdMob 広告（Android アプリのときだけ動く。Web 版では何もしない）
+- `ads-config.js` / `build-info.js` … ビルド時に生成される設定（リポジトリにあるのは Web 版の既定値）
 - `lib/three.module.js` … Three.js r160（MIT License、`lib/three.LICENSE`）
+- `android/` … Android アプリ（Capacitor）
+- `assets/` … アプリのアイコン・起動画面の元画像
+- `scripts/build-web.js` … Web 版・アプリ用のファイルを `www/` にまとめる
+
+## Android アプリ
+
+Web 版をそのまま Capacitor で Android アプリにしています（パッケージ名 `jp.techgym.kamakiri`、横画面専用）。ゲームのファイルはアプリに同梱しているので、オフラインでも遊べます。
+
+- 動作確認用 APK（デバッグ署名・テスト広告）のリリース画面：https://github.com/techgymjp/kamakiri/releases/tag/android-latest
+- APK を直接ダウンロード：https://github.com/techgymjp/kamakiri/releases/latest/download/kamakiri.apk
+
+main ブランチに push すると GitHub Actions（`.github/workflows/android.yml`）が APK を作り、上のリリース画面の APK を差し替えます。
+GitHub Secrets にアップロード鍵（`ANDROID_KEYSTORE_BASE64` など 4 つ）を登録すると、Google Play 用の署名付き AAB も作られます（Actions の実行結果の Artifacts に `kamakiri-release-aab`）。
+
+アプリ版で加わるもの：
+
+- 広告（AdMob）
+  - バナー：トップ・あそびかた・ポーズ・結果画面の下中央だけ（プレイ中は出さない）
+  - 全画面広告：プレイ開始、タイトルへ戻る、ポーズからの再開、結果画面からの「次の相手へ／コンティニュー／もう一度」のたび
+  - リワード広告：負けたラウンドの直後に「広告を見てやり直す」を出す（1 ゲーム 3 回まで）。最後まで見ると、そのラウンドを負ける前の状態からやり直せる。使った回数は結果画面とシェア文に出る
+- Android の戻るボタン：プレイ中はポーズ（ポーズ中は再開）、トップと結果画面ではアプリを終了
+- 別のアプリに切り替えると自動でポーズし、音を止める
+- シェアは Android の共有メニュー
+- トップ画面にバージョン、プライバシーポリシー、（EU など同意が必要な地域では）広告の設定
+
+開発用のコマンド：
+
+```bash
+npm ci
+```
+
+```bash
+npm run android:sync
+```
+
+本番の AdMob ID は、アプリ ID を `android/app/src/main/res/values/strings.xml` の `admob_app_id` に、広告ユニット ID を `ads.js` の `UNITS.android.production` に入れます。ID が空の種類は本番ビルドでは出しません。
+
+## ライセンス
+
+このゲームのソースコード・画像・音声などの著作権はテックジム株式会社に帰属します（All rights reserved）。許可なく複製・改変・再配布すること、Web サイトやアプリとして公開・販売することを禁止します。テックジムの受講生が学習目的で複製・改変することは許可します（アプリストアでの公開・広告・販売などの商用利用は不可）。詳しくは `LICENSE` を見てください。同梱の Three.js は MIT License です。
 
 ## GitHub Pages の設定
 
