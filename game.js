@@ -46,6 +46,7 @@ function audio() {
     try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
   }
   if (actx && actx.state === 'suspended') actx.resume();
+  if (actx && music.wanted && !music.timer) startMusic();
   return actx;
 }
 function tone(freq, dur, type = 'square', vol = 0.12, slide = 0) {
@@ -79,6 +80,176 @@ const sfx = {
   select() { tone(660, 0.07, 'triangle', 0.12); tone(990, 0.09, 'triangle', 0.08); },
   round() { tone(440, 0.12, 'square', 0.08); setTimeout(() => tone(660, 0.2, 'square', 0.08), 120); },
 };
+
+// ============================================================
+//  BGM（WebAudioによるシーケンサ。曲はすべてオリジナル）
+// ============================================================
+// 旋律の書式：「音名オクターブ:長さ(16分音符の数)」、休符は「-:長さ」
+const CHORDS = {
+  Am: [57, 60, 64], F: [53, 57, 60], G: [55, 59, 62], E: [52, 56, 59], Dm: [50, 53, 57],
+  C: [48, 52, 55], Bb: [46, 50, 53], Gm: [55, 58, 62], A: [57, 61, 64],
+};
+const SONGS = {
+  title: {
+    bpm: 96, loop: true, wave: 'triangle', leadVol: 0.07, bassVol: 0.08, padVol: 0.025,
+    chords: ['C', 'Am', 'F', 'G', 'C', 'Am', 'F', 'G'],
+    lead: 'E5:4 G5:4 A5:2 G5:2 E5:4 | C5:4 D5:4 E5:8 | A4:4 C5:4 D5:2 C5:2 A4:4 | G4:4 A4:2 C5:2 D5:8 |' +
+          'E5:4 G5:4 A5:2 C6:2 A5:4 | G5:4 E5:4 D5:8 | C5:4 D5:2 E5:2 G5:4 E5:4 | D5:4 C5:2 D5:2 C5:8',
+    bass: [0, null, 7, null, 12, null, 7, null],
+    drums: { kick: [0, 8], snare: [], hat: [4, 12] },
+  },
+  battle: {
+    bpm: 140, loop: true, wave: 'square', leadVol: 0.06, bassVol: 0.11, padVol: 0.02,
+    chords: ['Am', 'F', 'G', 'E', 'Dm', 'Am', 'F', 'E'],
+    lead: 'A4:2 C5:2 E5:4 D5:2 C5:2 B4:2 C5:2 | A4:4 F4:2 A4:2 C5:4 A4:4 | B4:2 D5:2 G5:4 F5:2 E5:2 D5:2 B4:2 | G#4:4 B4:4 E5:6 -:2 |' +
+          'F5:4 E5:2 D5:2 A4:4 D5:4 | E5:4 C5:2 A4:2 E5:2 F5:2 E5:4 | C5:2 D5:2 E5:2 F5:2 A5:4 G5:4 | E5:2 D5:2 B4:2 G#4:2 E4:4 -:4',
+    bass: [0, 0, 12, 0, 7, 0, 12, 7],
+    drums: { kick: [0, 6, 8], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14] },
+  },
+  boss: {
+    bpm: 164, loop: true, wave: 'sawtooth', leadVol: 0.045, bassVol: 0.12, padVol: 0.022,
+    chords: ['Dm', 'Bb', 'Gm', 'A', 'Dm', 'Bb', 'Gm', 'A'],
+    lead: 'D5:2 -:2 D5:2 E5:2 F5:4 E5:2 D5:2 | F5:2 -:2 F5:2 G5:2 A5:4 G5:2 F5:2 | G5:4 F5:2 E5:2 D5:4 Bb4:4 | C#5:4 E5:4 A5:6 -:2 |' +
+          'A5:2 G5:2 F5:2 E5:2 D5:4 A4:4 | Bb4:2 D5:2 F5:2 Bb5:2 A5:4 F5:4 | G5:2 A5:2 Bb5:2 A5:2 G5:4 D5:4 | E5:2 C#5:2 A4:2 C#5:2 E5:4 A5:4',
+    bass: [0, 0, 12, 0, 0, 12, 0, -1],
+    drums: { kick: [0, 3, 6, 8, 11, 14], snare: [4, 12], hat: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
+  },
+  victory: {
+    bpm: 150, loop: false, wave: 'square', leadVol: 0.07, bassVol: 0.1, padVol: 0.03,
+    chords: ['C', 'C', 'F', 'C'],
+    lead: 'C5:2 E5:2 G5:2 C6:6 A5:2 B5:2 | C6:16 | A5:2 C6:2 A5:2 F5:6 G5:2 A5:2 | G5:4 E5:4 C6:8',
+    bass: [0, null, 12, null, 0, null, 12, null],
+    drums: { kick: [0, 8], snare: [12], hat: [] },
+  },
+  gameover: {
+    bpm: 84, loop: false, wave: 'triangle', leadVol: 0.08, bassVol: 0.09, padVol: 0.03,
+    chords: ['Am', 'Dm', 'E', 'Am'],
+    lead: 'E5:4 D5:4 C5:4 B4:4 | A4:4 F4:4 D5:8 | B4:4 G#4:4 E4:8 | A4:16',
+    bass: [0, null, null, null, 7, null, null, null],
+    drums: { kick: [0], snare: [], hat: [] },
+  },
+};
+const NOTE_BASE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function parseLead(str) {
+  const ev = []; let step = 0;
+  for (const tok of str.replace(/\|/g, ' ').split(/\s+/).filter(Boolean)) {
+    const [n, l] = tok.split(':'); const len = Number(l);
+    if (n !== '-') {
+      const m = n.match(/^([A-G])(#|b)?(\d)$/);
+      ev.push({ step, len, midi: 12 * (Number(m[3]) + 1) + NOTE_BASE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) });
+    }
+    step += len;
+  }
+  return { ev, total: step };
+}
+for (const k of Object.keys(SONGS)) {
+  const sg = SONGS[k]; const { ev, total } = parseLead(sg.lead);
+  sg.leadAt = {}; for (const e of ev) sg.leadAt[e.step] = e;
+  sg.len = Math.max(total, sg.chords.length * 16);
+}
+
+const music = { wanted: null, name: null, bpm: 120, step: 0, next: 0, timer: null, gain: null, noise: null };
+const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
+function musicOut() {
+  if (!music.gain) {
+    music.gain = actx.createGain(); music.gain.gain.value = muted ? 0 : 0.9;
+    music.gain.connect(actx.destination);
+    const len = actx.sampleRate; const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    music.noise = buf;
+  }
+  return music.gain;
+}
+function mNote(t, freq, dur, type, vol, cutoff) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  let node = o;
+  if (cutoff) { const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; o.connect(f); node = f; }
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.setValueAtTime(vol, t + Math.max(0.02, dur - 0.05));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  node.connect(g).connect(musicOut());
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function mNoise(t, dur, vol, type, freq) {
+  const src = actx.createBufferSource(); src.buffer = music.noise;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(musicOut());
+  src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+}
+function mKick(t) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+  g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  o.connect(g).connect(musicOut()); o.start(t); o.stop(t + 0.2);
+}
+function scheduleStep(sg, step, t) {
+  const sixteenth = 60 / music.bpm / 4;
+  const bar = Math.floor(step / 16), inBar = step % 16;
+  const chord = CHORDS[sg.chords[bar % sg.chords.length]];
+  // 主旋律（2つの音を少しずらして厚みを出す）
+  const e = sg.leadAt[step];
+  if (e) {
+    const dur = e.len * sixteenth * 0.95;
+    mNote(t, midiHz(e.midi), dur, sg.wave, sg.leadVol, 3200);
+    mNote(t, midiHz(e.midi) * 1.004, dur, 'triangle', sg.leadVol * 0.6);
+  }
+  // ベース（8分音符）
+  if (inBar % 2 === 0) {
+    const off = sg.bass[(inBar / 2) % sg.bass.length]; // null は休符、負数は半音下の経過音
+    if (off !== null) mNote(t, midiHz(chord[0] - 24 + off), sixteenth * 1.8, 'sawtooth', sg.bassVol, 700);
+  }
+  // 和音パッド（小節頭）
+  if (inBar === 0) for (const n of chord) mNote(t, midiHz(n), sixteenth * 15.5, 'triangle', sg.padVol);
+  // ドラム
+  if (sg.drums.kick.includes(inBar)) mKick(t);
+  if (sg.drums.snare.includes(inBar)) { mNoise(t, 0.14, 0.18, 'bandpass', 1800); mNote(t, 190, 0.08, 'triangle', 0.06); }
+  if (sg.drums.hat.includes(inBar)) mNoise(t, 0.04, inBar % 4 === 2 ? 0.07 : 0.04, 'highpass', 7000);
+}
+function musicTick() {
+  const sg = SONGS[music.name]; if (!sg || !actx) return;
+  const now = actx.currentTime;
+  if (music.next < now - 0.2) music.next = now + 0.05; // タブ復帰時の詰まり防止
+  while (music.next < now + 0.15) {
+    scheduleStep(sg, music.step, music.next);
+    music.next += 60 / music.bpm / 4;
+    music.step++;
+    if (music.step >= sg.len) {
+      if (sg.loop) music.step = 0;
+      else { const nx = sg.then; stopMusic(); if (nx) playMusic(nx); return; }
+    }
+  }
+}
+function startMusic() {
+  if (!actx || !music.wanted) return;
+  const { name, bpm } = music.wanted;
+  music.name = name; music.bpm = bpm || SONGS[name].bpm; music.step = 0;
+  music.next = actx.currentTime + 0.08;
+  musicOut();
+  music.timer = setInterval(musicTick, 25);
+  musicTick();
+}
+function stopMusic() {
+  if (music.timer) clearInterval(music.timer);
+  music.timer = null; music.name = null; music.wanted = null;
+}
+function playMusic(name, bpm) {
+  if (music.wanted && music.wanted.name === name && music.wanted.bpm === bpm && music.timer) return;
+  if (music.timer) clearInterval(music.timer);
+  music.timer = null;
+  music.wanted = { name, bpm };
+  if (actx && actx.state !== 'closed') startMusic(); // 未操作時は最初のタップ/キー入力で開始
+}
+function setMusicLevel(v) {
+  if (music.gain && actx) music.gain.gain.setTargetAtTime(muted ? 0 : v, actx.currentTime, 0.05);
+}
+SONGS.ending = { ...SONGS.victory, then: 'title' };
+// ブラウザの自動再生制限：最初の操作で音を有効化
+window.addEventListener('pointerdown', () => audio(), { once: false, passive: true });
+window.addEventListener('keydown', () => audio(), { passive: true });
 
 // ============================================================
 //  シーン
@@ -743,11 +914,17 @@ if (isTouch) document.body.classList.add('is-touch');
 const sysEl = document.getElementById('sys');
 const pauseEl = document.getElementById('pause');
 const muteBtn = document.getElementById('muteBtn');
-function toggleMute() { muted = !muted; muteBtn.classList.toggle('off', muted); }
+function toggleMute() {
+  muted = !muted; muteBtn.classList.toggle('off', muted);
+  try { localStorage.setItem('kamakiri.muted', muted ? '1' : ''); } catch (e) { /* 無視 */ }
+  setMusicLevel(game.paused ? 0.25 : 0.9);
+}
+try { if (localStorage.getItem('kamakiri.muted')) { muted = true; muteBtn.classList.add('off'); } } catch (e) { /* 無視 */ }
 function setPaused(v) {
   if (game.mode !== 'match') v = false;
   game.paused = v;
   pauseEl.classList.toggle('hidden', !v);
+  setMusicLevel(v ? 0.25 : 0.9);
   if (v) keys.clear();
 }
 document.getElementById('pauseBtn').addEventListener('click', () => { audio(); setPaused(!game.paused); });
@@ -963,6 +1140,8 @@ function startStage(n) {
   fighters[1].setSpecies(ROSTER[n]);
   setupControllers();
   startRound();
+  // 通常ステージはステージが進むほどテンポアップ、最終ステージはボス曲
+  if (ROSTER[n].boss) playMusic('boss'); else playMusic('battle', SONGS.battle.bpm + n * 5);
   titleEl.classList.add('hidden'); resultEl.classList.add('hidden'); pauseEl.classList.add('hidden');
   sysEl.classList.remove('hidden');
   if (isTouch) touchEl.classList.remove('hidden');
@@ -985,6 +1164,7 @@ function toTitle() {
   cont.classList.toggle('hidden', saved <= 0);
   cont.textContent = `つづきから（STAGE ${saved + 1}：${ROSTER[saved].name}）`;
   setupControllers(); startRound(); game.phase = 'fight';
+  playMusic('title');
 }
 
 // 結果画面のボタン
@@ -1008,13 +1188,16 @@ function finishMatch(mw) {
   if (mw === 0) {
     if (n >= ROSTER.length - 1) {
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 無視 */ }
+      playMusic('ending');
       showResult('全ステージ制覇！', `${ROSTER[n].name} を倒し、真のカマキリ王になった！`, '最初から挑戦', () => startStage(0));
     } else {
       saveProgress(n + 1);
+      playMusic('victory');
       const nx = ROSTER[n + 1];
       showResult('STAGE CLEAR!', `次の相手：${nx.name}${nx.boss ? '（ボス）' : ''}`, '次の相手へ', () => startStage(n + 1));
     }
   } else {
+    playMusic('gameover');
     showResult(mw < 0 ? '引き分け…' : 'GAME OVER', `STAGE ${n + 1}：${ROSTER[n].name}`, 'コンティニュー', () => startStage(n));
   }
 }
@@ -1280,4 +1463,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // デバッグ用
-window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER };
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS };
