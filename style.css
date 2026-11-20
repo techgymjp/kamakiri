@@ -152,3 +152,14 @@ body.is-touch .keyboard-only { display: none; }
 
 h2 small { display: block; font-size: clamp(14px, 2.6vw, 22px); margin-top: 12px; color: #e4f5c8; text-shadow: 0 2px 0 #000; }
 .lead { margin: 14px 0 0; color: #e4f5c8; font-size: 14px; text-shadow: 0 1px 2px #000; }
+
+/* 言語切り替え・シェア */
+.lang {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));
+  font: inherit; font-size: 14px; font-weight: bold;
+  padding: 6px 14px; border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.6); background: rgba(0,0,0,.45); color: #fff; cursor: pointer;
+}
+.lang:hover { background: rgba(60,90,30,.7); }
+.menu button.share { background: #12324a; border-color: #6ec2ff; }
+.menu button.share:hover { background: #1d4a6c; }

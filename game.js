@@ -13,6 +13,62 @@ const resultEl = document.getElementById('result');
 const resultText = document.getElementById('resultText');
 const touchEl = document.getElementById('touch');
 
+// ============================================================
+//  多言語（日本語 / English）
+// ============================================================
+const I18N = {
+  ja: {
+    gameTitle: '格闘カマキリ', logo: '格闘<span>カマキリ</span>', subtitle: 'KAKUTO KAMAKIRI — 3D', langBtn: 'English',
+    start: '勝ち抜きバトル スタート', cont: 'つづきから（STAGE {n}：{name}）',
+    lead: '6匹のカマキリが順番に登場。勝つほど相手が強くなる！',
+    cMove: '移動', cJump: 'ジャンプ', cGuard: 'ガード', cLight: 'カマジャブ（弱）', cHeavy: '大鎌斬り（強）', cSpecial: '旋風鎌（必殺）',
+    kbNote: '空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。',
+    touchNote: '左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。',
+    bLight: '弱<small>カマジャブ</small>', bHeavy: '強<small>大鎌斬り</small>', bSp: '必<small>旋風鎌</small>',
+    resume: '再開', retry: '最初からやり直す', toTitle: 'タイトルへ', share: '結果をシェア',
+    aPause: '一時停止', aMute: '音のオン/オフ', aFull: '全画面',
+    allClear: '全ステージ制覇！', allClearSub: '{name} を倒し、真のカマキリ王になった！', restart: '最初から挑戦',
+    clear: 'STAGE CLEAR!', next: '次の相手：{name}{boss}', bossTag: '（ボス）', nextBtn: '次の相手へ',
+    draw: '引き分け…', gameover: 'GAME OVER', stageOf: 'STAGE {n}：{name}', continue: 'コンティニュー',
+    youWin: 'YOU WIN!', winsMsg: '{name} の勝ち', stage: 'STAGE {n}', finalStage: 'FINAL STAGE', vs: 'VS {name}　―　{desc}',
+    spOk: '旋風鎌 OK!', gauge: '気力', hit: '{n} HIT!',
+    shareClear: '格闘カマキリで STAGE {n}「{name}」を撃破！次は「{next}」に挑戦！',
+    shareAll: '格闘カマキリで全{total}ステージ制覇！真のカマキリ王になった！🦗👑',
+    shareLose: '格闘カマキリ STAGE {n} で「{name}」に敗北…リベンジします！',
+    hashtag: '#格闘カマキリ', copied: 'シェア用の文章とリンクをコピーしました！',
+  },
+  en: {
+    gameTitle: 'Kakuto Kamakiri', logo: 'KAKUTO <span>KAMAKIRI</span>', subtitle: 'MANTIS FIGHTING — 3D', langBtn: '日本語',
+    start: 'START ARCADE BATTLE', cont: 'CONTINUE (STAGE {n}: {name})',
+    lead: 'Six mantises await, one after another — each stronger than the last!',
+    cMove: 'Move', cJump: 'Jump', cGuard: 'Guard', cLight: 'Scythe Jab (light)', cHeavy: 'Great Slash (heavy)', cSpecial: 'Whirlwind Scythe (special)',
+    kbNote: 'Attack in midair for a Dive Scythe. The special costs 50 spirit. P / Esc to pause, M to mute.',
+    touchNote: 'Move with the left pad (slide up/down to jump/guard) and attack with the right buttons.<br>Press Jab or Slash in midair for a Dive Scythe. SP fires at 50 spirit.<br>Landscape mode is recommended.',
+    bLight: 'L<small>Jab</small>', bHeavy: 'H<small>Slash</small>', bSp: 'SP<small>Whirlwind</small>',
+    resume: 'Resume', retry: 'Restart Stage', toTitle: 'Title Screen', share: 'Share Result',
+    aPause: 'Pause', aMute: 'Sound on/off', aFull: 'Fullscreen',
+    allClear: 'ALL STAGES CLEARED!', allClearSub: 'You defeated the {name} and became the true Mantis King!', restart: 'Play Again',
+    clear: 'STAGE CLEAR!', next: 'Next opponent: {name}{boss}', bossTag: ' (BOSS)', nextBtn: 'Next Opponent',
+    draw: 'DRAW…', gameover: 'GAME OVER', stageOf: 'STAGE {n}: {name}', continue: 'Continue',
+    youWin: 'YOU WIN!', winsMsg: '{name} WINS', stage: 'STAGE {n}', finalStage: 'FINAL STAGE', vs: 'VS {name} — {desc}',
+    spOk: 'WHIRLWIND OK!', gauge: 'SPIRIT', hit: '{n} HITS!',
+    shareClear: 'I beat the {name} in Stage {n} of Kakuto Kamakiri! Next up: the {next}!',
+    shareAll: 'I cleared all {total} stages of Kakuto Kamakiri and became the true Mantis King! 🦗👑',
+    shareLose: 'Defeated by the {name} in Stage {n} of Kakuto Kamakiri... rematch time!',
+    hashtag: '#KakutoKamakiri', copied: 'Share text and link copied!',
+  },
+};
+let lang = 'ja';
+try { lang = localStorage.getItem('kamakiri.lang') || ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en'); } catch (e) { /* 無視 */ }
+if (!I18N[lang]) lang = 'en';
+function T(key, vars) {
+  let str = I18N[lang][key] ?? I18N.ja[key] ?? key;
+  if (vars) for (const [k, v] of Object.entries(vars)) str = str.split(`{${k}}`).join(String(v));
+  return str;
+}
+const nm = sp => (lang === 'en' ? sp.en : sp.name);
+const dsc = sp => (lang === 'en' ? sp.descEn : sp.desc);
+
 const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
@@ -962,20 +1018,20 @@ const MOVES = {
 const STAGE_HALF = 8.2;
 const WALK_F = 0.055, WALK_B = 0.04, JUMP_V = 0.21, GRAV = 0.0115;
 
-const PLAYER_SP = { name: 'オオカマキリ', body: 0x7cae3a, dark: 0x557f22, eye: 0xc9e88e, spike: 0x2f3b14, wingCss: 'rgb(140,190,80)', veinCss: 'rgba(60,100,30,.7)', hindCss: 'rgb(120,80,60)', scale: 1, atk: 1, def: 1, spd: 1 };
+const PLAYER_SP = { name: 'オオカマキリ', en: 'Japanese Giant Mantis', body: 0x7cae3a, dark: 0x557f22, eye: 0xc9e88e, spike: 0x2f3b14, wingCss: 'rgb(140,190,80)', veinCss: 'rgba(60,100,30,.7)', hindCss: 'rgb(120,80,60)', scale: 1, atk: 1, def: 1, spd: 1 };
 // 勝ち抜きで登場する相手（だんだん強くなる）
 const ROSTER = [
-  { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', level: 0.0, scale: 0.82, atk: 0.8, def: 0.85, spd: 1.05,
+  { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', en: "Small Brown Mantis", descEn: 'Tiny but nimble, a ninja of the grass', level: 0.0, scale: 0.82, atk: 0.8, def: 0.85, spd: 1.05,
     body: 0x8a7a5e, dark: 0x5e4f3a, eye: 0xc8b890, spike: 0x2a2418, wingCss: 'rgb(150,130,100)', veinCss: 'rgba(80,60,40,.7)', hindCss: 'rgb(100,80,60)' },
-  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', level: 0.22, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
+  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', en: "Broad-bellied Mantis", descEn: 'A treetop hunter with a wide belly', level: 0.22, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
     body: 0x6fbf45, dark: 0x4a8f2a, eye: 0xd7f0a0, spike: 0x2a3a14, wingCss: 'rgb(120,200,80)', veinCss: 'rgba(240,250,200,.8)', hindCss: 'rgb(110,150,80)' },
-  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', level: 0.42, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
+  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', en: "Narrow-winged Mantis", descEn: 'Scythe master who rules the meadow', level: 0.42, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
     body: 0x9b7646, dark: 0x6c4f2c, eye: 0xdcc58e, spike: 0x2f2414, wingCss: 'rgb(170,130,80)', veinCss: 'rgba(90,60,30,.7)', hindCss: 'rgb(90,70,90)' },
-  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', level: 0.62, scale: 0.92, atk: 1.05, def: 0.95, spd: 1.25,
+  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', en: "Orchid Mantis", descEn: 'A beautiful assassin disguised as a flower', level: 0.62, scale: 0.92, atk: 1.05, def: 0.95, spd: 1.25,
     body: 0xf2d6e4, dark: 0xe0a8c4, eye: 0xf8e8a8, spike: 0x9a5a78, wingCss: 'rgb(250,225,238)', veinCss: 'rgba(220,150,190,.8)', hindCss: 'rgb(250,210,230)' },
-  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', level: 0.8, scale: 1.05, atk: 1.1, def: 1.25, spd: 0.95, shield: 0.32,
+  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', en: "Dead Leaf Mantis", descEn: 'A defensive master camouflaged as a dead leaf', level: 0.8, scale: 1.05, atk: 1.1, def: 1.25, spd: 0.95, shield: 0.32,
     body: 0x8a5a30, dark: 0x5a3818, eye: 0xc89a60, spike: 0x2a180a, wingCss: 'rgb(150,100,55)', veinCss: 'rgba(70,40,15,.8)', hindCss: 'rgb(60,40,80)' },
-  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', level: 1.0, scale: 1.25, atk: 1.3, def: 1.35, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
+  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', en: "Devil's Flower Mantis", descEn: 'The mightiest mantis of all', level: 1.0, scale: 1.25, atk: 1.3, def: 1.35, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
     body: 0x9cc068, dark: 0x5a3a6a, eye: 0xe8f0b0, spike: 0x301838, wingCss: 'rgb(170,200,120)', veinCss: 'rgba(80,40,90,.8)', hindCss: 'rgb(120,40,140)' },
 ];
 
@@ -1162,7 +1218,7 @@ function toTitle() {
   const saved = loadProgress();
   const cont = document.getElementById('continueBtn');
   cont.classList.toggle('hidden', saved <= 0);
-  cont.textContent = `つづきから（STAGE ${saved + 1}：${ROSTER[saved].name}）`;
+  cont.textContent = T('cont', { n: saved + 1, name: nm(ROSTER[saved]) });
   setupControllers(); startRound(); game.phase = 'fight';
   playMusic('title');
 }
@@ -1171,11 +1227,12 @@ function toTitle() {
 const againBtn = document.getElementById('againBtn');
 let againAction = null;
 function showResult(title, sub, btnLabel, action) {
+  shareMsg.textContent = '';
   resultText.innerHTML = title + (sub ? `<small>${sub}</small>` : '');
   againBtn.textContent = btnLabel || '';
   againBtn.classList.toggle('hidden', !btnLabel);
   againAction = action;
-  resultEl.classList.remove('hidden'); touchEl.classList.add('hidden');
+  resultEl.classList.remove('hidden'); touchEl.classList.add('hidden'); sysEl.classList.add('hidden');
 }
 document.getElementById('startBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(0); });
 document.getElementById('continueBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(loadProgress()); });
@@ -1189,16 +1246,19 @@ function finishMatch(mw) {
     if (n >= ROSTER.length - 1) {
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 無視 */ }
       playMusic('ending');
-      showResult('全ステージ制覇！', `${ROSTER[n].name} を倒し、真のカマキリ王になった！`, '最初から挑戦', () => startStage(0));
+      game.shareText = T('shareAll', { total: ROSTER.length });
+      showResult(T('allClear'), T('allClearSub', { name: nm(ROSTER[n]) }), T('restart'), () => startStage(0));
     } else {
       saveProgress(n + 1);
       playMusic('victory');
       const nx = ROSTER[n + 1];
-      showResult('STAGE CLEAR!', `次の相手：${nx.name}${nx.boss ? '（ボス）' : ''}`, '次の相手へ', () => startStage(n + 1));
+      game.shareText = T('shareClear', { n: n + 1, name: nm(ROSTER[n]), next: nm(nx) });
+      showResult(T('clear'), T('next', { name: nm(nx), boss: nx.boss ? T('bossTag') : '' }), T('nextBtn'), () => startStage(n + 1));
     }
   } else {
     playMusic('gameover');
-    showResult(mw < 0 ? '引き分け…' : 'GAME OVER', `STAGE ${n + 1}：${ROSTER[n].name}`, 'コンティニュー', () => startStage(n));
+    game.shareText = T('shareLose', { n: n + 1, name: nm(ROSTER[n]) });
+    showResult(mw < 0 ? T('draw') : T('gameover'), T('stageOf', { n: n + 1, name: nm(ROSTER[n]) }), T('continue'), () => startStage(n));
   }
 }
 
@@ -1295,8 +1355,8 @@ function step() {
     const t = game.phaseT - game.introLen;
     if (t < 0) {
       const sp = ROSTER[game.stage];
-      game.msg = sp.boss ? `FINAL STAGE` : `STAGE ${game.stage + 1}`;
-      game.sub = `VS ${sp.name}　―　${sp.desc}`;
+      game.msg = sp.boss ? T('finalStage') : T('stage', { n: game.stage + 1 });
+      game.sub = T('vs', { name: nm(sp), desc: dsc(sp) });
     } else {
       game.sub = '';
       game.msg = t < 70 ? `ROUND ${game.round}` : 'FIGHT!';
@@ -1317,7 +1377,7 @@ function step() {
       if (w >= 0) { fighters[w].state = 'win'; fighters[w].move = null; fighters[w].spin = 0; }
       if (game.mode === 'title') { game.wins = [0, 0]; startRound(); game.phase = 'fight'; return; }
       if (w >= 0) game.wins[w]++;
-      game.msg = w < 0 ? 'DRAW' : w === 0 ? 'YOU WIN!' : `${fighters[w].name} の勝ち`;
+      game.msg = w < 0 ? 'DRAW' : w === 0 ? T('youWin') : T('winsMsg', { name: nm(fighters[w].sp) });
     }
     if (game.phaseT === 200) {
       if (game.wins[0] >= 2 || game.wins[1] >= 2 || game.round >= 5) {
@@ -1360,6 +1420,13 @@ function updateCamera(time) {
 //  HUD
 // ============================================================
 const spBtn = document.querySelector('#touch .b-sp');
+// 文字が画面幅に収まるようフォントサイズを自動調整
+function fitFont(g, text, size, maxW, weight) {
+  const fam = '"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  g.font = `${weight} ${size}px ${fam}`;
+  const w = g.measureText(text).width;
+  if (w > maxW) g.font = `${weight} ${Math.floor(size * maxW / w)}px ${fam}`;
+}
 function drawHUD() {
   const g = hctx;
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1384,7 +1451,7 @@ function drawHUD() {
     g.font = 'bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
     g.textAlign = i === 0 ? 'left' : 'right';
     g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.7)'; g.fillStyle = '#fff';
-    const label = (i === 1 ? '' : '1P ') + f.name;
+    const label = (i === 1 ? '' : '1P ') + nm(f.sp);
     const nx = i === 0 ? left : left + bw;
     g.strokeText(label, nx, top + bh + 20); g.fillText(label, nx, top + bh + 20);
     // 勝利数
@@ -1406,12 +1473,12 @@ function drawHUD() {
     g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(ex + ew / 2 - 1, ey, 2, eh);
     g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff';
     g.textAlign = i === 0 ? 'left' : 'right';
-    g.fillText(full ? '旋風鎌 OK!' : '気力', i === 0 ? ex : ex + ew, ey - 6);
+    g.fillText(full ? T('spOk') : T('gauge'), i === 0 ? ex : ex + ew, ey - 6);
     // コンボ
     if (f.combo >= 2 && f.comboT > 0) {
       g.font = 'bold 30px sans-serif'; g.textAlign = i === 0 ? 'left' : 'right';
       g.lineWidth = 5; g.strokeStyle = '#000'; g.fillStyle = '#ffd84d';
-      const t = `${f.combo} HIT!`;
+      const t = T('hit', { n: f.combo });
       const cx = i === 0 ? 40 : 920;
       g.strokeText(t, cx, 150); g.fillText(t, cx, 150);
     }
@@ -1425,8 +1492,8 @@ function drawHUD() {
 
   // メッセージ
   if (game.msg) {
-    const big = game.msg.length < 10;
-    g.font = `900 ${big ? 84 : 52}px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif`;
+    const big = game.msg.length < 12;
+    fitFont(g, game.msg, big ? 84 : 52, 900, '900');
     g.lineWidth = 10; g.strokeStyle = '#1b2a0c';
     const grd = g.createLinearGradient(0, 220, 0, 300);
     grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#a6ff4d');
@@ -1434,7 +1501,7 @@ function drawHUD() {
     g.strokeText(game.msg, 480, 290); g.fillText(game.msg, 480, 290);
   }
   if (game.sub) {
-    g.font = 'bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    fitFont(g, game.sub, 24, 900, 'bold');
     g.lineWidth = 6; g.strokeStyle = '#1b2a0c'; g.fillStyle = '#fff';
     g.strokeText(game.sub, 480, 340); g.fillText(game.sub, 480, 340);
   }
@@ -1447,8 +1514,51 @@ function drawHUD() {
 }
 
 // ============================================================
+//  言語切り替え
+// ============================================================
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = lang === 'en' ? 'Kakuto Kamakiri — Mantis Fighting 3D' : '格闘カマキリ';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = T(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', T(el.dataset.i18nAria)); el.title = T(el.dataset.i18nAria); });
+  document.getElementById('langBtn').textContent = T('langBtn');
+  const saved = loadProgress();
+  document.getElementById('continueBtn').textContent = T('cont', { n: saved + 1, name: nm(ROSTER[saved]) });
+}
+document.getElementById('langBtn').addEventListener('click', () => {
+  audio(); sfx.select();
+  lang = lang === 'ja' ? 'en' : 'ja';
+  try { localStorage.setItem('kamakiri.lang', lang); } catch (e) { /* 無視 */ }
+  applyLang();
+});
+
+// ============================================================
+//  結果のシェア
+// ============================================================
+const shareMsg = document.getElementById('shareMsg');
+document.getElementById('shareBtn').addEventListener('click', async () => {
+  audio(); sfx.select();
+  const url = location.href.split('#')[0].split('?')[0];
+  const text = `${game.shareText || T('gameTitle')} ${T('hashtag')}`;
+  shareMsg.textContent = '';
+  // スマホなどOSの共有機能が使える場合はそれを使う
+  if (navigator.share) {
+    try { await navigator.share({ title: T('gameTitle'), text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  // それ以外は X（旧Twitter）の投稿画面を開く
+  const intent = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  const win = window.open(intent, '_blank', 'noopener');
+  if (!win) {
+    try { await navigator.clipboard.writeText(`${text} ${url}`); shareMsg.textContent = T('copied'); } catch (e) { /* 無視 */ }
+  }
+});
+
+// ============================================================
 //  メインループ
 // ============================================================
+applyLang();
 toTitle();
 let last = performance.now(), acc = 0;
 function frame(now) {

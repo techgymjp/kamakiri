@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>格闘カマキリ</title>
+  <title>格闘カマキリ / Kakuto Kamakiri</title>
+  <meta name="description" content="本物のカマキリを3Dで再現した格闘ゲーム。A 3D fighting game starring realistic praying mantises." />
+  <meta property="og:title" content="格闘カマキリ / Kakuto Kamakiri" />
+  <meta property="og:description" content="勝ち抜きバトルで真のカマキリ王を目指せ！ Fight your way to become the true Mantis King!" />
+  <meta property="og:type" content="website" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -13,70 +17,74 @@
       <canvas id="hud"></canvas>
       <!-- システムボタン -->
       <div id="sys" class="hidden">
-        <button id="pauseBtn" aria-label="一時停止">Ⅱ</button>
-        <button id="muteBtn" aria-label="音のオン/オフ">♪</button>
-        <button id="fsBtn" aria-label="全画面">⛶</button>
+        <button id="pauseBtn" data-i18n-aria="aPause">Ⅱ</button>
+        <button id="muteBtn" data-i18n-aria="aMute">♪</button>
+        <button id="fsBtn" data-i18n-aria="aFull">⛶</button>
       </div>
     </div>
 
     <!-- タイトル -->
     <div id="title" class="overlay">
-      <h1>格闘<span>カマキリ</span></h1>
-      <p class="sub">KAKUTO KAMAKIRI — 3D</p>
+      <button id="langBtn" class="lang">English</button>
+      <h1 data-i18n-html="logo">格闘<span>カマキリ</span></h1>
+      <p class="sub" data-i18n="subtitle">KAKUTO KAMAKIRI — 3D</p>
       <div class="menu">
-        <button id="startBtn" class="primary">勝ち抜きバトル スタート</button>
+        <button id="startBtn" class="primary" data-i18n="start">勝ち抜きバトル スタート</button>
         <button id="continueBtn" class="hidden">つづきから</button>
       </div>
-      <p class="lead">6匹のカマキリが順番に登場。勝つほど相手が強くなる！</p>
+      <p class="lead" data-i18n="lead">6匹のカマキリが順番に登場。勝つほど相手が強くなる！</p>
       <div class="howto keyboard-only">
         <table>
-          <tr><td>移動</td><td>A / D（← / →）</td></tr>
-          <tr><td>ジャンプ</td><td>W（↑）</td></tr>
-          <tr><td>ガード</td><td>S（↓）</td></tr>
-          <tr><td>カマジャブ（弱）</td><td>J</td></tr>
-          <tr><td>大鎌斬り（強）</td><td>K</td></tr>
-          <tr><td>旋風鎌（必殺）</td><td>L</td></tr>
+          <tr><td data-i18n="cMove">移動</td><td>A / D（← / →）</td></tr>
+          <tr><td data-i18n="cJump">ジャンプ</td><td>W（↑）</td></tr>
+          <tr><td data-i18n="cGuard">ガード</td><td>S（↓）</td></tr>
+          <tr><td data-i18n="cLight">カマジャブ（弱）</td><td>J</td></tr>
+          <tr><td data-i18n="cHeavy">大鎌斬り（強）</td><td>K</td></tr>
+          <tr><td data-i18n="cSpecial">旋風鎌（必殺）</td><td>L</td></tr>
         </table>
-        <p>空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。</p>
+        <p data-i18n="kbNote">空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。</p>
       </div>
       <div class="howto touch-only">
-        <p>左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。</p>
+        <p data-i18n-html="touchNote">左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。</p>
+      </div>
+    </div>
+
+    <!-- 一時停止 -->
+    <div id="pause" class="overlay hidden">
+      <h2>PAUSE</h2>
+      <div class="menu">
+        <button id="resumeBtn" class="primary" data-i18n="resume">再開</button>
+        <button id="retryBtn" data-i18n="retry">最初からやり直す</button>
+        <button id="pauseTitleBtn" data-i18n="toTitle">タイトルへ</button>
       </div>
     </div>
 
     <!-- 結果 -->
-    <div id="pause" class="overlay hidden">
-      <h2>PAUSE</h2>
-      <div class="menu">
-        <button id="resumeBtn" class="primary">再開</button>
-        <button id="retryBtn">最初からやり直す</button>
-        <button id="pauseTitleBtn">タイトルへ</button>
-      </div>
-    </div>
-
     <div id="result" class="overlay hidden">
       <h2 id="resultText"></h2>
       <div class="menu">
         <button id="againBtn" class="primary">もう一度</button>
-        <button id="titleBtn">タイトルへ</button>
+        <button id="shareBtn" class="share" data-i18n="share">結果をシェア</button>
+        <button id="titleBtn" data-i18n="toTitle">タイトルへ</button>
       </div>
+      <p id="shareMsg" class="lead"></p>
     </div>
 
     <!-- タッチ操作（スマホ） -->
     <div id="touch" class="hidden">
       <div id="pad">
-        <span class="lbl up">ジャンプ</span>
+        <span class="lbl up" data-i18n="cJump">ジャンプ</span>
         <span class="lbl left">◀</span>
         <span class="lbl right">▶</span>
-        <span class="lbl down">ガード</span>
+        <span class="lbl down" data-i18n="cGuard">ガード</span>
         <div id="knob"></div>
       </div>
       <div class="btns">
-        <button data-key="KeyW" class="b-jump">ジャンプ</button>
-        <button data-key="KeyS" class="b-guard">ガード</button>
-        <button data-key="KeyJ" class="b-light">弱<small>カマジャブ</small></button>
-        <button data-key="KeyK" class="b-heavy">強<small>大鎌斬り</small></button>
-        <button data-key="KeyL" class="b-sp">必<small>旋風鎌</small></button>
+        <button data-key="KeyW" class="b-jump" data-i18n="cJump">ジャンプ</button>
+        <button data-key="KeyS" class="b-guard" data-i18n="cGuard">ガード</button>
+        <button data-key="KeyJ" class="b-light" data-i18n-html="bLight">弱<small>カマジャブ</small></button>
+        <button data-key="KeyK" class="b-heavy" data-i18n-html="bHeavy">強<small>大鎌斬り</small></button>
+        <button data-key="KeyL" class="b-sp" data-i18n-html="bSp">必<small>旋風鎌</small></button>
       </div>
     </div>
 

@@ -1,5 +1,7 @@
 # 格闘カマキリ（KAKUTO KAMAKIRI 3D）
 
+日本語 / English 対応（タイトル画面右上で切り替え。初回はブラウザの言語設定に合わせて自動選択）
+
 本物のカマキリを3Dで再現した、ブラウザで遊べる格闘ゲームです。
 
 - 体節のある腹部、細長い前胸、三角の頭と複眼、棘の並んだ鎌（前脚）、4本の歩脚、前翅・後翅を Three.js で手続き生成
@@ -31,6 +33,8 @@ python3 -m http.server 8000
 | 5 | カレハカマキリ | 守りが固い |
 | FINAL | ニセハナマオウカマキリ | 大型・攻守とも最強のボス |
 
+結果画面の「結果をシェア」で、スマホでは端末の共有メニュー、PCでは X（旧Twitter）の投稿画面から結果をシェアできます。
+
 負けても「コンティニュー」で同じステージから再挑戦できます。到達ステージは保存され、タイトルの「つづきから」で再開できます。
 
 ## 操作
@@ -61,3 +65,15 @@ python3 -m http.server 8000
 ## GitHub Pages の設定
 
 Settings → Pages → Source: 「Deploy from a branch」、Branch: `main` / `(root)`
+
+---
+
+## English
+
+**Kakuto Kamakiri** is a 3D fighting game starring realistic, procedurally modeled praying mantises. Battle six real mantis species in a row — each stronger than the last — and become the true Mantis King.
+
+- Controls: A/D (or ←/→) move, W jump, S guard, J Scythe Jab, K Great Slash, L Whirlwind Scythe (costs 50 spirit). Touch controls appear on phones.
+- Opponents: Small Brown Mantis → Broad-bellied Mantis → Narrow-winged Mantis → Orchid Mantis → Dead Leaf Mantis → Devil's Flower Mantis (boss)
+- Original BGM synthesized live with WebAudio
+- Share your result from the result screen
+- Switch language with the button at the top-right of the title screen
