@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>格闘カマキリ</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="wrap">
+    <div id="stage">
+      <canvas id="gl"></canvas>
+      <canvas id="hud"></canvas>
+    </div>
+
+    <!-- タイトル -->
+    <div id="title" class="overlay">
+      <h1>格闘<span>カマキリ</span></h1>
+      <p class="sub">KAKUTO KAMAKIRI — 3D</p>
+      <div class="menu">
+        <button data-mode="cpu" data-diff="0">1P VS CPU（よわい）</button>
+        <button data-mode="cpu" data-diff="1" class="primary">1P VS CPU（ふつう）</button>
+        <button data-mode="cpu" data-diff="2">1P VS CPU（つよい）</button>
+        <button data-mode="2p">2P 対戦（1台で）</button>
+      </div>
+      <div class="howto">
+        <table>
+          <tr><th></th><th>1P</th><th>2P</th></tr>
+          <tr><td>移動</td><td>A / D</td><td>← / →</td></tr>
+          <tr><td>ジャンプ</td><td>W</td><td>↑</td></tr>
+          <tr><td>ガード</td><td>S</td><td>↓</td></tr>
+          <tr><td>カマジャブ（弱）</td><td>J</td><td>1 / ,</td></tr>
+          <tr><td>大鎌斬り（強）</td><td>K</td><td>2 / .</td></tr>
+          <tr><td>旋風鎌（必殺）</td><td>L</td><td>3 / /</td></tr>
+        </table>
+        <p>空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止。</p>
+      </div>
+    </div>
+
+    <!-- 結果 -->
+    <div id="result" class="overlay hidden">
+      <h2 id="resultText"></h2>
+      <div class="menu">
+        <button id="againBtn" class="primary">もう一度</button>
+        <button id="titleBtn">タイトルへ</button>
+      </div>
+    </div>
+
+    <!-- タッチ操作 -->
+    <div id="touch" class="hidden">
+      <div class="pad">
+        <button data-key="KeyW" class="up">▲</button>
+        <button data-key="KeyA" class="left">◀</button>
+        <button data-key="KeyS" class="down">守</button>
+        <button data-key="KeyD" class="right">▶</button>
+      </div>
+      <div class="btns">
+        <button data-key="KeyJ">弱</button>
+        <button data-key="KeyK">強</button>
+        <button data-key="KeyL" class="sp">必</button>
+      </div>
+    </div>
+  </div>
+  <script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
