@@ -92,9 +92,9 @@ body.is-touch .keyboard-only { display: none; }
 }
 #touch .btns {
   display: grid; gap: 8px;
-  grid-template-columns: repeat(3, 66px);
-  grid-template-rows: 40px 66px 66px;
-  grid-template-areas: "jump guard ." ". heavy sp" "light . sp";
+  grid-template-columns: repeat(3, 72px);
+  grid-template-rows: 72px 72px;
+  grid-template-areas: ". heavy sp" "light . sp";
   pointer-events: none;
 }
 #touch .btns button {
@@ -108,11 +108,9 @@ body.is-touch .keyboard-only { display: none; }
 }
 #touch .btns button small { font-size: 9px; font-weight: bold; margin-top: 2px; opacity: .85; }
 #touch .btns button.on { background: rgba(140,220,60,.8); transform: scale(.94); }
-#touch .b-jump { grid-area: jump; border-radius: 22px !important; font-size: 12px !important; white-space: nowrap; }
-#touch .b-guard { grid-area: guard; border-radius: 22px !important; font-size: 12px !important; white-space: nowrap; border-color: rgba(120,190,255,.8) !important; }
 #touch .b-light { grid-area: light; }
 #touch .b-heavy { grid-area: heavy; }
-#touch .b-sp { grid-area: sp; align-self: center; width: 66px; height: 66px; border-color: #ffcf4d !important; font-size: 24px !important; }
+#touch .b-sp { grid-area: sp; align-self: center; width: 72px; height: 72px; border-color: #ffcf4d !important; font-size: 24px !important; }
 #touch .b-sp.ready { background: rgba(255,170,30,.75); box-shadow: 0 0 14px #ffcf4d; }
 
 #sys {
@@ -132,8 +130,8 @@ body.is-touch .keyboard-only { display: none; }
   #sys { top: -54px; }
   #pad { --s: 140px; }
   #touch { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
-  #touch .btns { grid-template-columns: repeat(3, 62px); grid-template-rows: 40px 62px 62px; gap: 6px; }
-  #touch .b-sp { width: 62px; height: 62px; }
+  #touch .btns { grid-template-columns: repeat(3, 66px); grid-template-rows: 66px 66px; gap: 6px; }
+  #touch .b-sp { width: 66px; height: 66px; }
 }
 /* 横画面の小さい端末 */
 @media (orientation: landscape) and (max-height: 500px) {
@@ -141,8 +139,8 @@ body.is-touch .keyboard-only { display: none; }
   .keyboard-only { display: none; }
   #pad { --s: 130px; }
   #knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
-  #touch .btns { grid-template-columns: repeat(3, 58px); grid-template-rows: 34px 58px 58px; gap: 6px; }
-  #touch .b-sp { width: 58px; height: 58px; }
+  #touch .btns { grid-template-columns: repeat(3, 64px); grid-template-rows: 64px 64px; gap: 6px; }
+  #touch .b-sp { width: 64px; height: 64px; }
   #touch .btns button { opacity: .9; }
   #sys button { width: 34px; height: 34px; font-size: 14px; }
   .menu button { padding: 8px 14px; font-size: 16px; }
