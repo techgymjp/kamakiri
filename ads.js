@@ -12,7 +12,7 @@ window.Ads = (() => {
       },
       // 本番の広告ユニット（AdMob の Android アプリ「格闘カマキリ」）。届いたら入れる
       production: {
-        interstitial: '',
+        interstitial: 'ca-app-pub-6411535997477460/4359922458',
         rewarded: '',
         banner: 'ca-app-pub-6411535997477460/5673004126',
       },
