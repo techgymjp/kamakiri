@@ -866,7 +866,10 @@ class AIController {
     this.react = Math.max(4, Math.round(26 - 21 * level));
     this.guardP = Math.min(0.9, 0.12 + 0.76 * level);
     this.aggr = 0.4 + 0.5 * level;
+    this.level = level;
     this.cd = 30; this.hold = null; this.holdT = 0; this.out = {}; this.seenAtk = -1;
+    this.pressure = 0;      // 警戒度：攻撃を受けるほど上がり、時間とともに下がる
+    this.prevState = 'idle'; this.punishedAtk = -1;
   }
   bind(self, opp) { this.self = self; this.opp = opp; }
   update() {
@@ -874,15 +877,56 @@ class AIController {
     const out = { left: false, right: false, down: false, up: false, light: false, heavy: false, special: false };
     if (!f || !o) return out;
     const dx = o.x - f.x, dist = Math.abs(dx), fwd = dx > 0 ? 'right' : 'left', back = dx > 0 ? 'left' : 'right';
+    const prev = this.prevState; this.prevState = f.state;
+    const free = f.state === 'idle' || f.state === 'walk' || f.state === 'guard';
+    const oReach = 2.1 * o.sp.scale;
+
+    // 警戒度：攻撃を受けた瞬間に上昇（連打への学習）
+    if (f.state === 'hit' && prev !== 'hit') this.pressure = Math.min(1, this.pressure + 0.3);
+    this.pressure *= 0.996;
+    const guardP = Math.min(0.95, this.guardP + this.pressure * 0.35);
+
+    if (free && f.y === 0) {
+      // 反撃：ガード直後、または相手の空振り・技後のすきを狙う
+      const oRecover = o.state === 'attack' && o.mt >= o.move.startup + o.move.active && o.atkId !== this.punishedAtk;
+      const k = f.sp.scale, lightReach = MOVES.light.hb[1] * k + 0.5, heavyReach = MOVES.heavy.hb[1] * k + 0.5; // +0.5 は相手の体の幅
+      // 技の戻りが長い相手には、届かなくても踏み込んで反撃
+      if (oRecover && dist >= lightReach && dist < heavyReach + 1.2) {
+        const remain = o.move.startup + o.move.active + o.move.recovery - o.mt;
+        if (remain > 8 && Math.random() < 0.15 + 0.5 * this.level) { out[fwd] = true; this.walk = fwd; this.cd = 3; return out; }
+      }
+      if ((prev === 'block' || oRecover) && dist < heavyReach && Math.random() < 0.3 + 0.6 * this.level) {
+        this.punishedAtk = o.atkId; this.holdT = 0;
+        if (dist < lightReach) out.light = true; else out.heavy = true;
+        this.cd = 6;
+        return out;
+      }
+      // 立ち直り直後に相手が目の前なら、まずガード
+      if (prev === 'hit' && dist < oReach + 0.4 && Math.random() < guardP) {
+        this.hold = { down: true }; this.holdT = 14 + Math.floor(Math.random() * 8); this.cd = this.holdT;
+      }
+      // 先読みガード：間合いの中で相手が攻めてきそうなとき
+      else if (this.holdT <= 0 && dist < oReach + 0.3 && o.state !== 'attack' &&
+               Math.random() < (0.01 + 0.03 * this.level) * (1 + 4 * this.pressure)) {
+        this.hold = { down: true }; this.holdT = 12 + Math.floor(Math.random() * 12); this.cd = this.holdT;
+      }
+    }
 
     // 反応ガード
     if (o.state === 'attack' && o.atkId !== this.seenAtk && o.mt >= Math.max(1, Math.floor(this.react * 0.5))) {
       this.seenAtk = o.atkId;
-      if (dist < 3.2 && Math.random() < this.guardP) {
-        this.hold = { down: true }; this.holdT = o.move.startup + o.move.active + 6 - o.mt; this.cd = this.holdT;
+      const left = o.move.startup + o.move.active + 6 - o.mt;
+      if (dist < 3.2 && Math.random() < guardP) {
+        this.hold = { down: true }; this.holdT = left; this.cd = this.holdT;
+      } else if (dist < 3.4 && Math.random() < 0.2 + 0.6 * this.level) {
+        // ガードしないときは間合いの外へ下がって空振りさせる
+        this.hold = { [back]: true }; this.holdT = left; this.cd = this.holdT;
       }
     }
     if (this.holdT > 0) { this.holdT--; Object.assign(out, this.hold); return out; }
+    // 相手の技が出ている間は、その間合いへ踏み込まない
+    const oThreat = o.state === 'attack' && o.mt < o.move.startup + o.move.active && dist < o.move.hb[1] * o.sp.scale + 1.2;
+    if (oThreat && this.walk === fwd && Math.random() < 0.3 + 0.7 * this.level) this.walk = null;
     if (--this.cd > 0) { if (this.walk) out[this.walk] = true; return out; }
     this.cd = Math.floor(this.react * rnd(0.6, 1.4));
     this.walk = null;
@@ -1006,7 +1050,7 @@ document.getElementById('pauseTitleBtn').addEventListener('click', () => { sfx.s
 //  技データ（フレーム@60fps、距離はワールド単位）
 // ============================================================
 const MOVES = {
-  light: { name: 'カマジャブ', startup: 5, active: 4, recovery: 10, dmg: 5, hb: [0.3, 2.05, 0.9, 2.1], kb: 0.07, hitstun: 15, blockstun: 10, en: 6, hitstop: 5, shake: 0.05, pose: ['lightUp', 'lightHit'] },
+  light: { name: 'カマジャブ', startup: 5, active: 4, recovery: 11, dmg: 5, hb: [0.3, 2.05, 0.9, 2.1], kb: 0.08, hitstun: 12, blockstun: 8, en: 6, hitstop: 5, shake: 0.05, pose: ['lightUp', 'lightHit'] },
   heavy: { name: '大鎌斬り', startup: 14, active: 5, recovery: 22, dmg: 13, hb: [0.2, 2.35, 0.1, 2.7], kb: 0.15, hitstun: 24, blockstun: 15, en: 10, hitstop: 9, shake: 0.14, lunge: 0.06, chip: 1, pose: ['heavyUp', 'heavyHit'] },
   air: { name: '急降下鎌', startup: 4, active: 14, recovery: 6, dmg: 8, hb: [-0.1, 1.7, -0.3, 1.3], kb: 0.1, hitstun: 18, blockstun: 11, en: 7, hitstop: 6, shake: 0.08, pose: ['jump', 'air'] },
   special: { name: '旋風鎌', startup: 12, active: 28, recovery: 20, dmg: 4, multi: 6, hb: [-0.6, 1.9, 0.0, 2.3], kb: 0.05, lastKb: 0.22, hitstun: 20, blockstun: 12, en: 0, cost: 50, hitstop: 4, shake: 0.08, dash: 0.13, chip: 1, pose: ['spUp', 'sp'] },
@@ -1023,15 +1067,15 @@ const PLAYER_SP = { name: 'オオカマキリ', en: 'Japanese Giant Mantis', bod
 const ROSTER = [
   { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', en: "Small Brown Mantis", descEn: 'Tiny but nimble, a ninja of the grass', level: 0.0, scale: 0.82, atk: 0.8, def: 0.85, spd: 1.05,
     body: 0x8a7a5e, dark: 0x5e4f3a, eye: 0xc8b890, spike: 0x2a2418, wingCss: 'rgb(150,130,100)', veinCss: 'rgba(80,60,40,.7)', hindCss: 'rgb(100,80,60)' },
-  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', en: "Broad-bellied Mantis", descEn: 'A treetop hunter with a wide belly', level: 0.22, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
+  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', en: "Broad-bellied Mantis", descEn: 'A treetop hunter with a wide belly', level: 0.25, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
     body: 0x6fbf45, dark: 0x4a8f2a, eye: 0xd7f0a0, spike: 0x2a3a14, wingCss: 'rgb(120,200,80)', veinCss: 'rgba(240,250,200,.8)', hindCss: 'rgb(110,150,80)' },
-  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', en: "Narrow-winged Mantis", descEn: 'Scythe master who rules the meadow', level: 0.42, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
+  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', en: "Narrow-winged Mantis", descEn: 'Scythe master who rules the meadow', level: 0.45, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
     body: 0x9b7646, dark: 0x6c4f2c, eye: 0xdcc58e, spike: 0x2f2414, wingCss: 'rgb(170,130,80)', veinCss: 'rgba(90,60,30,.7)', hindCss: 'rgb(90,70,90)' },
-  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', en: "Orchid Mantis", descEn: 'A beautiful assassin disguised as a flower', level: 0.62, scale: 0.92, atk: 1.05, def: 0.95, spd: 1.25,
+  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', en: "Orchid Mantis", descEn: 'A beautiful assassin disguised as a flower', level: 0.6, scale: 0.92, atk: 1.1, def: 1.05, spd: 1.25,
     body: 0xf2d6e4, dark: 0xe0a8c4, eye: 0xf8e8a8, spike: 0x9a5a78, wingCss: 'rgb(250,225,238)', veinCss: 'rgba(220,150,190,.8)', hindCss: 'rgb(250,210,230)' },
-  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', en: "Dead Leaf Mantis", descEn: 'A defensive master camouflaged as a dead leaf', level: 0.8, scale: 1.05, atk: 1.1, def: 1.25, spd: 0.95, shield: 0.32,
+  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', en: "Dead Leaf Mantis", descEn: 'A defensive master camouflaged as a dead leaf', level: 0.7, scale: 1.05, atk: 1.1, def: 1.05, spd: 0.95, shield: 0.32,
     body: 0x8a5a30, dark: 0x5a3818, eye: 0xc89a60, spike: 0x2a180a, wingCss: 'rgb(150,100,55)', veinCss: 'rgba(70,40,15,.8)', hindCss: 'rgb(60,40,80)' },
-  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', en: "Devil's Flower Mantis", descEn: 'The mightiest mantis of all', level: 1.0, scale: 1.25, atk: 1.3, def: 1.35, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
+  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', en: "Devil's Flower Mantis", descEn: 'The mightiest mantis of all', level: 0.82, scale: 1.25, atk: 1.05, def: 1.05, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
     body: 0x9cc068, dark: 0x5a3a6a, eye: 0xe8f0b0, spike: 0x301838, wingCss: 'rgb(170,200,120)', veinCss: 'rgba(80,40,90,.8)', hindCss: 'rgb(120,40,140)' },
 ];
 
@@ -1308,7 +1352,8 @@ function checkHit(a, d) {
     game.sound && sfx.block();
     return;
   }
-  d.hp -= m.dmg * a.sp.atk / d.sp.def;
+  const scale = Math.max(0.4, 1 - 0.15 * a.combo); // 続けて当てるほどダメージが減る
+  d.hp -= m.dmg * scale * a.sp.atk / d.sp.def;
   d.flash = 10;
   d.state = 'hit'; d.stun = m.hitstun; d.move = null; d.spin = 0;
   d.vx = a.face * (last ? m.lastKb : m.kb);
@@ -1617,10 +1662,11 @@ document.getElementById('langBtn').addEventListener('click', () => {
 // ============================================================
 //  結果のシェア
 // ============================================================
+const SHARE_URL = 'https://techgym.jp/column/claude-code-game-kamakiri/';
 const shareMsg = document.getElementById('shareMsg');
 document.getElementById('shareBtn').addEventListener('click', async () => {
   audio(); sfx.select();
-  const url = location.href.split('#')[0].split('?')[0];
+  const url = SHARE_URL;
   const text = `${game.shareText || T('gameTitle')} ${T('hashtag')}`;
   shareMsg.textContent = '';
   // スマホなどOSの共有機能が使える場合はそれを使う
@@ -1654,4 +1700,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // デバッグ用
-window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime };
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime, step, AIController };
