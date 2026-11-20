@@ -74,6 +74,11 @@ Web 版をそのまま Capacitor で Android アプリにしています（パ�
 
 - 動作確認用 APK（デバッグ署名・テスト広告）のリリース画面：https://github.com/techgymjp/kamakiri/releases/tag/android-latest
 - APK を直接ダウンロード：https://github.com/techgymjp/kamakiri/releases/latest/download/kamakiri.apk
+- スマホで読み取る QR コード（リリース画面）：
+
+  ![Android APK のリリース画面](docs/apk-qr.png)
+
+ストアの掲載文の下書きは `docs/store/listing.md` にあります。
 
 main ブランチに push すると GitHub Actions（`.github/workflows/android.yml`）が APK を作り、上のリリース画面の APK を差し替えます。
 GitHub Secrets にアップロード鍵（`ANDROID_KEYSTORE_BASE64` など 4 つ）を登録すると、Google Play 用の署名付き AAB も作られます（Actions の実行結果の Artifacts に `kamakiri-release-aab`）。
