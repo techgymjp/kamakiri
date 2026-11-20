@@ -4,6 +4,6 @@
     <string name="title_activity_main">格闘カマキリ</string>
     <string name="package_name">jp.techgym.kamakiri</string>
     <string name="custom_url_scheme">jp.techgym.kamakiri</string>
-    <!-- Google AdMob のアプリ ID。本番の ID が届いたら差し替える（今は Google 公式のテスト用 ID） -->
-    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+    <!-- Google AdMob のアプリ ID（AdMob の Android アプリ「格闘カマキリ」） -->
+    <string name="admob_app_id">ca-app-pub-6411535997477460~7153606753</string>
 </resources>
