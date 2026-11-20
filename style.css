@@ -191,3 +191,5 @@ h2 small { display: block; font-size: clamp(14px, 2.6vw, 22px); margin-top: 12px
   #howtoScreen h2 { margin-bottom: 6px; }
 }
 .overlay.ad-wait { pointer-events: none; }
+.load { margin: -8px 0 10px; color: #cfe3b8; font-size: 13px; min-height: 1em; }
+.menu button:disabled { opacity: .5; cursor: wait; transform: none; }

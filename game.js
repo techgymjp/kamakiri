@@ -19,7 +19,7 @@ const touchEl = document.getElementById('touch');
 const I18N = {
   ja: {
     gameTitle: '格闘カマキリ', logo: '格闘<span>カマキリ</span>', subtitle: 'KAKUTO KAMAKIRI — 3D', langBtn: 'English',
-    start: 'プレイ', cont: 'つづきから（STAGE {n}：{name}）', howto: 'あそびかた',
+    loading: 'サウンドを準備中… {p}%', start: 'プレイ', cont: 'つづきから（STAGE {n}：{name}）', howto: 'あそびかた',
     rules: '各ステージ2本先取。6匹のカマキリを勝ち抜くとクリア！',
     best: 'ベスト：STAGE {n} までクリア', bestAll: 'ベスト：全ステージ制覇！👑',
     privacy: 'プライバシーポリシー', privacyUrl: 'https://techgym.jp/privacy-policy/', adSettings: '広告の設定',
@@ -45,7 +45,7 @@ const I18N = {
   },
   en: {
     gameTitle: 'Kakuto Kamakiri', logo: 'KAKUTO <span>KAMAKIRI</span>', subtitle: 'MANTIS FIGHTING — 3D', langBtn: '日本語',
-    start: 'PLAY', cont: 'CONTINUE (STAGE {n}: {name})', howto: 'HOW TO PLAY',
+    loading: 'Preparing sound... {p}%', start: 'PLAY', cont: 'CONTINUE (STAGE {n}: {name})', howto: 'HOW TO PLAY',
     rules: 'Win 2 rounds to clear each stage. Defeat all six mantises to win!',
     best: 'Best: cleared up to Stage {n}', bestAll: 'Best: ALL STAGES CLEARED! 👑',
     privacy: 'Privacy Policy', privacyUrl: 'https://techgym.jp/privacy-policy-en/', adSettings: 'Ad settings',
@@ -113,50 +113,89 @@ resize();
 // ============================================================
 let actx = null;
 let muted = false;
+// 音は「ゲーム開始前に」すべて録音済みの音（AudioBuffer）として作っておき、プレイ中は再生するだけにする。
+// その場で音符を鳴らす方式だと、3D 描画で処理が詰まったときに音が途切れるため。
+const SR = 32000;            // 録音のサンプリング周波数（合成音なのでこれで十分。メモリも節約）
+let sfxGain = null;
 function audio() {
   if (!actx) {
     try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+    if (actx) {
+      sfxGain = actx.createGain(); sfxGain.connect(actx.destination);
+      music.gain = actx.createGain(); music.gain.gain.value = muted ? 0 : 0.9; music.gain.connect(actx.destination);
+      // 端末の音声出力を起こしておく（無音を一度鳴らす）
+      const b = actx.createBuffer(1, 1, actx.sampleRate), src = actx.createBufferSource();
+      src.buffer = b; src.connect(actx.destination); src.start();
+    }
   }
-  if (actx && actx.state === 'suspended') actx.resume();
-  if (actx && music.wanted && !music.timer) startMusic();
+  if (actx && actx.state === 'suspended' && !document.hidden && !(window.Ads && window.Ads.showing)) actx.resume();
+  if (actx && music.wanted && !music.src) startMusic();
   return actx;
 }
-function tone(freq, dur, type = 'square', vol = 0.12, slide = 0) {
-  const a = actx; if (!a || muted) return;
-  const o = a.createOscillator(), g = a.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, a.currentTime);
-  if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, freq + slide), a.currentTime + dur);
-  g.gain.setValueAtTime(vol, a.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-  o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + dur);
-}
-function noise(dur, vol = 0.2, freq = 2000, q = 1) {
-  const a = actx; if (!a || muted) return;
-  const len = Math.floor(a.sampleRate * dur);
-  const buf = a.createBuffer(1, len, a.sampleRate);
+
+// ---------- 録音用の部品（OfflineAudioContext 上で音を組み立てる） ----------
+function makeNoise(ac) {
+  const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
   const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = a.createBufferSource(); src.buffer = buf;
-  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
-  const g = a.createGain(); g.gain.value = vol;
-  src.connect(f).connect(g).connect(a.destination); src.start();
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
 }
+function vTone(R, t, freq, dur, type, vol, slide = 0) {
+  const { ac, out } = R;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, freq + slide), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.01);
+}
+function vNoise(R, t, dur, vol, freq, q = 1, type = 'bandpass', fade = 'lin') {
+  const { ac, out } = R;
+  const src = ac.createBufferSource(); src.buffer = R.noise;
+  const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  if (fade === 'lin') g.gain.linearRampToValueAtTime(0, t + dur);
+  else g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(out);
+  src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.01);
+}
+// seconds 秒ぶんを録音し、AudioBuffer を返す
+function renderOffline(seconds, build) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) return Promise.resolve(null);
+  const ac = new OAC(1, Math.ceil(seconds * SR), SR);
+  const R = { ac, out: ac.destination, noise: makeNoise(ac) };
+  build(R);
+  return ac.startRendering();
+}
+
 // 広告の表示中やアプリが裏に回ったときに音を止める（ads.js からも呼ばれる）
 window.Sound = {
   suspend() { if (actx && actx.state === 'running') actx.suspend(); },
   resume() { if (actx && !document.hidden) actx.resume(); },
 };
-const sfx = {
-  swing() { noise(0.09, 0.12, 3500, 0.8); },
-  hit() { noise(0.12, 0.45, 1400); tone(160, 0.1, 'sawtooth', 0.12, -90); },
-  heavy() { noise(0.2, 0.55, 800); tone(110, 0.18, 'sawtooth', 0.16, -60); },
-  block() { tone(1300, 0.05, 'square', 0.06); noise(0.05, 0.15, 5000, 2); },
-  jump() { noise(0.06, 0.06, 6000, 1); },
-  special() { noise(0.35, 0.25, 2500, 0.5); tone(300, 0.3, 'triangle', 0.08, 500); },
-  ko() { tone(220, 0.6, 'sawtooth', 0.15, -180); noise(0.5, 0.4, 600); },
-  select() { tone(660, 0.07, 'triangle', 0.12); tone(990, 0.09, 'triangle', 0.08); },
-  round() { tone(440, 0.12, 'square', 0.08); setTimeout(() => tone(660, 0.2, 'square', 0.08), 120); },
+
+// ---------- 効果音 ----------
+const SFX_DEFS = {
+  swing: [0.12, R => vNoise(R, 0, 0.09, 0.12, 3500, 0.8)],
+  hit: [0.15, R => { vNoise(R, 0, 0.12, 0.45, 1400); vTone(R, 0, 160, 0.1, 'sawtooth', 0.12, -90); }],
+  heavy: [0.24, R => { vNoise(R, 0, 0.2, 0.55, 800); vTone(R, 0, 110, 0.18, 'sawtooth', 0.16, -60); }],
+  block: [0.08, R => { vTone(R, 0, 1300, 0.05, 'square', 0.06); vNoise(R, 0, 0.05, 0.15, 5000, 2); }],
+  jump: [0.08, R => vNoise(R, 0, 0.06, 0.06, 6000, 1)],
+  special: [0.4, R => { vNoise(R, 0, 0.35, 0.25, 2500, 0.5); vTone(R, 0, 300, 0.3, 'triangle', 0.08, 500); }],
+  ko: [0.65, R => { vTone(R, 0, 220, 0.6, 'sawtooth', 0.15, -180); vNoise(R, 0, 0.5, 0.4, 600); }],
+  select: [0.12, R => { vTone(R, 0, 660, 0.07, 'triangle', 0.12); vTone(R, 0, 990, 0.09, 'triangle', 0.08); }],
+  round: [0.36, R => { vTone(R, 0, 440, 0.12, 'square', 0.08); vTone(R, 0.12, 660, 0.2, 'square', 0.08); }],
 };
+const sfxBufs = {};
+function playSfx(name) {
+  if (!actx || muted || actx.state !== 'running') return;
+  const b = sfxBufs[name]; if (!b) return;
+  const src = actx.createBufferSource(); src.buffer = b; src.connect(sfxGain); src.start();
+}
+const sfx = {};
+for (const k of Object.keys(SFX_DEFS)) sfx[k] = () => playSfx(k);
 
 // ============================================================
 //  BGM（WebAudioによるシーケンサ。曲はすべてオリジナル）
@@ -225,105 +264,128 @@ for (const k of Object.keys(SONGS)) {
   sg.len = Math.max(total, sg.chords.length * 16);
 }
 
-const music = { wanted: null, name: null, bpm: 120, step: 0, next: 0, timer: null, gain: null, noise: null };
+const music = { wanted: null, src: null, key: null, gain: null };
 const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
-function musicOut() {
-  if (!music.gain) {
-    music.gain = actx.createGain(); music.gain.gain.value = muted ? 0 : 0.9;
-    music.gain.connect(actx.destination);
-    const len = actx.sampleRate; const buf = actx.createBuffer(1, len, actx.sampleRate);
-    const d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    music.noise = buf;
-  }
-  return music.gain;
-}
-function mNote(t, freq, dur, type, vol, cutoff) {
-  const o = actx.createOscillator(), g = actx.createGain();
+function mNote(R, t, freq, dur, type, vol, cutoff) {
+  const { ac, out } = R;
+  const o = ac.createOscillator(), g = ac.createGain();
   o.type = type; o.frequency.value = freq;
   let node = o;
-  if (cutoff) { const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; o.connect(f); node = f; }
+  if (cutoff) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; o.connect(f); node = f; }
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
   g.gain.setValueAtTime(vol, t + Math.max(0.02, dur - 0.05));
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  node.connect(g).connect(musicOut());
+  node.connect(g).connect(out);
   o.start(t); o.stop(t + dur + 0.02);
 }
-function mNoise(t, dur, vol, type, freq) {
-  const src = actx.createBufferSource(); src.buffer = music.noise;
-  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
-  const g = actx.createGain();
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(f).connect(g).connect(musicOut());
-  src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
-}
-function mKick(t) {
-  const o = actx.createOscillator(), g = actx.createGain();
+function mKick(R, t) {
+  const { ac, out } = R;
+  const o = ac.createOscillator(), g = ac.createGain();
   o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
   g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-  o.connect(g).connect(musicOut()); o.start(t); o.stop(t + 0.2);
+  o.connect(g).connect(out); o.start(t); o.stop(t + 0.2);
 }
-function scheduleStep(sg, step, t) {
-  const sixteenth = 60 / music.bpm / 4;
+function scheduleStep(R, sg, step, t, sixteenth) {
   const bar = Math.floor(step / 16), inBar = step % 16;
   const chord = CHORDS[sg.chords[bar % sg.chords.length]];
   // 主旋律（2つの音を少しずらして厚みを出す）
   const e = sg.leadAt[step];
   if (e) {
     const dur = e.len * sixteenth * 0.95;
-    mNote(t, midiHz(e.midi), dur, sg.wave, sg.leadVol, 3200);
-    mNote(t, midiHz(e.midi) * 1.004, dur, 'triangle', sg.leadVol * 0.6);
+    mNote(R, t, midiHz(e.midi), dur, sg.wave, sg.leadVol, 3200);
+    mNote(R, t, midiHz(e.midi) * 1.004, dur, 'triangle', sg.leadVol * 0.6);
   }
   // ベース（8分音符）
   if (inBar % 2 === 0) {
     const off = sg.bass[(inBar / 2) % sg.bass.length]; // null は休符、負数は半音下の経過音
-    if (off !== null) mNote(t, midiHz(chord[0] - 24 + off), sixteenth * 1.8, 'sawtooth', sg.bassVol, 700);
+    if (off !== null) mNote(R, t, midiHz(chord[0] - 24 + off), sixteenth * 1.8, 'sawtooth', sg.bassVol, 700);
   }
   // 和音パッド（小節頭）
-  if (inBar === 0) for (const n of chord) mNote(t, midiHz(n), sixteenth * 15.5, 'triangle', sg.padVol);
+  if (inBar === 0) for (const n of chord) mNote(R, t, midiHz(n), sixteenth * 15.5, 'triangle', sg.padVol);
   // ドラム
-  if (sg.drums.kick.includes(inBar)) mKick(t);
-  if (sg.drums.snare.includes(inBar)) { mNoise(t, 0.14, 0.18, 'bandpass', 1800); mNote(t, 190, 0.08, 'triangle', 0.06); }
-  if (sg.drums.hat.includes(inBar)) mNoise(t, 0.04, inBar % 4 === 2 ? 0.07 : 0.04, 'highpass', 7000);
+  if (sg.drums.kick.includes(inBar)) mKick(R, t);
+  if (sg.drums.snare.includes(inBar)) { vNoise(R, t, 0.14, 0.18, 1800, 1, 'bandpass', 'exp'); mNote(R, t, 190, 0.08, 'triangle', 0.06); }
+  if (sg.drums.hat.includes(inBar)) vNoise(R, t, 0.04, inBar % 4 === 2 ? 0.07 : 0.04, 7000, 1, 'highpass', 'exp');
 }
-function musicTick() {
-  const sg = SONGS[music.name]; if (!sg || !actx) return;
-  const now = actx.currentTime;
-  if (music.next < now - 0.2) music.next = now + 0.05; // タブ復帰時の詰まり防止
-  while (music.next < now + 0.15) {
-    scheduleStep(sg, music.step, music.next);
-    music.next += 60 / music.bpm / 4;
-    music.step++;
-    if (music.step >= sg.len) {
-      if (sg.loop) music.step = 0;
-      else { const nx = sg.then; stopMusic(); if (nx) playMusic(nx); return; }
-    }
-  }
+// 1 曲ぶんを録音する（ループする曲はちょうど 1 周ぶん。繰り返し再生してもつなぎ目が出ない）
+const songBufs = {};
+const songKey = (name, bpm) => `${SONGS[name].base || name}@${bpm || SONGS[name].bpm}`;
+function renderSong(name, bpm) {
+  const key = songKey(name, bpm);
+  if (songBufs[key]) return songBufs[key];
+  const sg = SONGS[name], tempo = bpm || sg.bpm, sixteenth = 60 / tempo / 4;
+  const len = sg.len * sixteenth;
+  songBufs[key] = renderOffline(sg.loop ? len : len + 1.5, R => {
+    for (let st = 0; st < sg.len; st++) scheduleStep(R, sg, st, st * sixteenth, sixteenth);
+  }).then(buf => (songBufs[key] = buf));
+  return songBufs[key];
+}
+function stopSource(src) {
+  if (!src || !actx) return;
+  try {
+    const g = src.__gain; const t = actx.currentTime;
+    g.gain.setTargetAtTime(0, t, 0.03);
+    src.stop(t + 0.15);
+  } catch (e) { /* 停止済み */ }
 }
 function startMusic() {
   if (!actx || !music.wanted) return;
   const { name, bpm } = music.wanted;
-  music.name = name; music.bpm = bpm || SONGS[name].bpm; music.step = 0;
-  music.next = actx.currentTime + 0.08;
-  musicOut();
-  music.timer = setInterval(musicTick, 25);
-  musicTick();
+  const key = songKey(name, bpm);
+  const buf = songBufs[key];
+  if (!buf || typeof buf.then === 'function') { // まだ録音中なら、できしだい再生
+    Promise.resolve(renderSong(name, bpm)).then(() => { if (music.wanted && songKey(music.wanted.name, music.wanted.bpm) === key && !music.src) startMusic(); });
+    return;
+  }
+  stopSource(music.src);
+  const sg = SONGS[name];
+  const src = actx.createBufferSource(), g = actx.createGain();
+  src.buffer = buf; src.loop = !!sg.loop; src.__gain = g;
+  src.connect(g).connect(music.gain);
+  src.start(actx.currentTime + 0.03);
+  music.src = src; music.key = key;
+  if (!sg.loop) src.onended = () => {
+    if (music.src !== src) return;
+    music.src = null; music.wanted = null;
+    if (sg.then) playMusic(sg.then);
+  };
 }
 function stopMusic() {
-  if (music.timer) clearInterval(music.timer);
-  music.timer = null; music.name = null; music.wanted = null;
+  stopSource(music.src);
+  music.src = null; music.wanted = null; music.key = null;
 }
 function playMusic(name, bpm) {
-  if (music.wanted && music.wanted.name === name && music.wanted.bpm === bpm && music.timer) return;
-  if (music.timer) clearInterval(music.timer);
-  music.timer = null;
+  if (music.wanted && music.wanted.name === name && music.wanted.bpm === bpm && music.src) return;
+  stopSource(music.src); music.src = null;
   music.wanted = { name, bpm };
   if (actx && actx.state !== 'closed') startMusic(); // 未操作時は最初のタップ/キー入力で開始
 }
 function setMusicLevel(v) {
   if (music.gain && actx) music.gain.gain.setTargetAtTime(muted ? 0 : v, actx.currentTime, 0.05);
 }
-SONGS.ending = { ...SONGS.victory, then: 'title' };
+SONGS.ending = { ...SONGS.victory, then: 'title', base: 'victory' };
+
+// ---------- ゲーム開始前に、すべての音を録音しておく ----------
+const soundLoad = { done: 0, total: 0, ready: false, onReady: [] };
+async function preloadSounds() {
+  const jobs = [
+    ...Object.keys(SFX_DEFS).map(k => () => renderOffline(SFX_DEFS[k][0], SFX_DEFS[k][1]).then(b => { sfxBufs[k] = b; })),
+    () => renderSong('title'),
+    // 通常ステージはステージが進むほどテンポアップ（STAGE 1〜5）
+    ...[0, 1, 2, 3, 4].map(n => () => renderSong('battle', SONGS.battle.bpm + n * 5)),
+    () => renderSong('boss'), () => renderSong('victory'), () => renderSong('gameover'),
+  ];
+  soundLoad.total = jobs.length;
+  for (const job of jobs) {
+    try { await job(); } catch (e) { /* 録音できない環境では無音で続ける */ }
+    soundLoad.done++;
+    updateLoadUI();
+  }
+  soundLoad.ready = true;
+  updateLoadUI();
+  if (actx && music.wanted && !music.src) startMusic();
+}
 // ブラウザの自動再生制限：最初の操作で音を有効化
 window.addEventListener('pointerdown', () => audio(), { once: false, passive: true });
 window.addEventListener('keydown', () => audio(), { passive: true });
@@ -1724,6 +1786,7 @@ function applyLang() {
   const saved = loadProgress();
   document.getElementById('continueBtn').textContent = T('cont', { n: saved + 1, name: nm(ROSTER[saved]) });
   document.getElementById('privacyLink').href = T('privacyUrl');
+  updateLoadUI();
   updateBest();
 }
 document.getElementById('langBtn').addEventListener('click', () => {
@@ -1843,6 +1906,18 @@ if (window.APP_VERSION && window.APP_VERSION !== 'dev') document.getElementById(
 Ads.initDone.then(() => { if (Ads.privacyOptionsRequired) document.getElementById('adPrivacy').classList.remove('hidden'); });
 document.getElementById('adPrivacyLink').addEventListener('click', e => { e.preventDefault(); Ads.showPrivacyOptions(); });
 
+// サウンドの準備が終わるまでは「プレイ」を押せないようにする
+const loadMsg = document.getElementById('loadMsg');
+function updateLoadUI() {
+  const ready = soundLoad.ready;
+  for (const id of ['startBtn', 'continueBtn', 'howtoPlayBtn']) document.getElementById(id).disabled = !ready;
+  loadMsg.textContent = ready ? '' : T('loading', { p: soundLoad.total ? Math.floor(100 * soundLoad.done / soundLoad.total) : 0 });
+}
+updateLoadUI();
+preloadSounds();
+// 万一とても遅い端末でも、遊べなくならないようにする
+setTimeout(() => { if (!soundLoad.ready) { soundLoad.ready = true; updateLoadUI(); } }, 20000);
+
 // ============================================================
 //  メインループ
 // ============================================================
@@ -1863,5 +1938,5 @@ requestAnimationFrame(frame);
 
 // web-only:start
 // テスト・検証用（アプリ用のビルドでは取り除く）
-window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime, step, AIController, camera, renderer, scene };
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime, step, AIController, camera, renderer, scene, soundLoad, songBufs, sfxBufs };
 // web-only:end
