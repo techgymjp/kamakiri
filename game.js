@@ -31,7 +31,7 @@ const I18N = {
     clear: 'STAGE CLEAR!', next: '次の相手：{name}{boss}', bossTag: '（ボス）', nextBtn: '次の相手へ',
     draw: '引き分け…', gameover: 'GAME OVER', stageOf: 'STAGE {n}：{name}', continue: 'コンティニュー',
     youWin: 'YOU WIN!', winsMsg: '{name} の勝ち', stage: 'STAGE {n}', finalStage: 'FINAL STAGE', vs: 'VS {name}　―　{desc}',
-    spOk: '旋風鎌 OK!', gauge: '気力', hit: '{n} HIT!',
+    spOk: '旋風鎌 OK!', gauge: '気力', spName: '必殺！旋風鎌', hit: '{n} HIT!',
     shareClear: '格闘カマキリで STAGE {n}「{name}」を撃破！次は「{next}」に挑戦！',
     shareAll: '格闘カマキリで全{total}ステージ制覇！真のカマキリ王になった！🦗👑',
     shareLose: '格闘カマキリ STAGE {n} で「{name}」に敗北…リベンジします！',
@@ -51,7 +51,7 @@ const I18N = {
     clear: 'STAGE CLEAR!', next: 'Next opponent: {name}{boss}', bossTag: ' (BOSS)', nextBtn: 'Next Opponent',
     draw: 'DRAW…', gameover: 'GAME OVER', stageOf: 'STAGE {n}: {name}', continue: 'Continue',
     youWin: 'YOU WIN!', winsMsg: '{name} WINS', stage: 'STAGE {n}', finalStage: 'FINAL STAGE', vs: 'VS {name} — {desc}',
-    spOk: 'WHIRLWIND OK!', gauge: 'SPIRIT', hit: '{n} HITS!',
+    spOk: 'WHIRLWIND OK!', gauge: 'SPIRIT', spName: 'WHIRLWIND SCYTHE!', hit: '{n} HITS!',
     shareClear: 'I beat the {name} in Stage {n} of Kakuto Kamakiri! Next up: the {next}!',
     shareAll: 'I cleared all {total} stages of Kakuto Kamakiri and became the true Mantis King! 🦗👑',
     shareLose: 'Defeated by the {name} in Stage {n} of Kakuto Kamakiri... rematch time!',
@@ -1064,7 +1064,13 @@ class Fighter {
     this.move = MOVES[key]; this.moveKey = key; this.mt = 0; this.hasHit = false; this.state = 'attack';
     this.atkId = ++atkCounter;
     if (key === 'light') this.jabArm = !this.jabArm;
-    if (key === 'special') { this.en -= this.move.cost; game.sound && sfx.special(); }
+    if (key === 'special') {
+      this.en -= this.move.cost; game.sound && sfx.special();
+      if (game.mode === 'match') { // 発動の瞬間に時間を止めてカメラが回り込む
+        game.cine = SPECIAL_CINE; game.cineF = this;
+        camFx = { type: 'special', f: this, start: simTime, dur: SPECIAL_CINE };
+      }
+    }
     if (key === 'air') this.airUsed = true;
     this.vx = this.grounded ? 0 : this.vx;
   }
@@ -1170,9 +1176,16 @@ const game = {
   mode: 'title', // title / match / result
   stage: 0, phase: 'intro', phaseT: 0, round: 1, wins: [0, 0], timer: 99 * 60,
   hitstop: 0, shake: 0, slow: 0, paused: false, msg: '', sub: '', winner: -1, sound: false,
-  ctrls: [null, null], introLen: 0,
+  ctrls: [null, null], introLen: 0, cine: 0, cineF: null,
 };
 let camMid = 0, camDist = 9;
+// カメラ演出
+const SPECIAL_CINE = 48;      // 必殺技の演出時間（フレーム）
+let camFx = null;             // 現在のカメラ演出
+let camBlend = 0;             // 演出後に通常カメラへ戻す残りフレーム
+const camPos = new THREE.Vector3(0, 2.5, 10), camLook = new THREE.Vector3(0, 1.2, 0);
+const _tp = new THREE.Vector3(), _tl = new THREE.Vector3();
+const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 const SAVE_KEY = 'kamakiri.stage';
 function loadProgress() { try { return Math.min(ROSTER.length - 1, Number(localStorage.getItem(SAVE_KEY)) || 0); } catch (e) { return 0; } }
@@ -1203,6 +1216,8 @@ function startStage(n) {
   if (isTouch) touchEl.classList.remove('hidden');
 }
 function startRound() {
+  if (camFx) { camFx = null; camBlend = 45; }
+  game.cine = 0;
   fighters[0].reset(-2.6, 1, false); fighters[1].reset(2.6, -1, false);
   game.timer = 99 * 60; game.phase = 'intro'; game.phaseT = 0; game.winner = -1; game.slow = 0; game.paused = false;
   game.introLen = game.mode === 'match' && game.round === 1 ? 130 : 0;
@@ -1310,6 +1325,8 @@ function checkHit(a, d) {
   if (d.hp <= 0) {
     d.hp = 0; d.state = 'ko'; d.vx = a.face * 0.12; d.vy = 0.16;
     game.phase = 'ko'; game.phaseT = 0; game.slow = 70; game.hitstop = 18; game.shake = 0.3;
+    game.cine = 0;
+    if (game.mode === 'match') camFx = { type: 'ko', loser: d, winner: a, start: simTime, dur: 150 };
     game.winner = a.idx; game.msg = 'K.O.!';
     if (game.sound) sfx.ko();
   }
@@ -1338,6 +1355,13 @@ function step() {
     return;
   }
   if (game.paused) return;
+  if (game.cine > 0) { // 必殺技の演出中：技を出した側だけ構えを取る
+    game.cine--;
+    const f = game.cineF;
+    if (f) { lerpPose(f.pose, POSES.spUp, 0.15); f.flash = 0; }
+    if (game.cine === 0 && game.sound) sfx.swing();
+    return;
+  }
   if (game.hitstop > 0) { game.hitstop--; return; }
   if (game.slow > 0) { game.slow--; if (game.slow % 3 !== 0) return; }
 
@@ -1374,6 +1398,7 @@ function step() {
   } else if (game.phase === 'ko') {
     const w = game.winner;
     if (game.phaseT === 90) {
+      if (w >= 0 && camFx && camFx.type === 'ko') camFx = { type: 'win', winner: fighters[w], start: simTime, dur: 240 };
       if (w >= 0) { fighters[w].state = 'win'; fighters[w].move = null; fighters[w].spin = 0; }
       if (game.mode === 'title') { game.wins = [0, 0]; startRound(); game.phase = 'fight'; return; }
       if (w >= 0) game.wins[w]++;
@@ -1399,6 +1424,7 @@ function updateCamera(time) {
     camMid += (mid - camMid) * 0.05;
     camera.position.set(camMid + Math.sin(t) * 7, 1.6 + Math.sin(t * 0.7) * 0.6, 4.5 + Math.cos(t) * 3.5 + 2);
     camera.lookAt(camMid, 1.2, 0);
+    camPos.copy(camera.position); camLook.set(camMid, 1.2, 0); camFx = null;
     return;
   }
   const mid = (a.x + b.x) / 2;
@@ -1406,13 +1432,41 @@ function updateCamera(time) {
   const tgtDist = Math.max(7.2, Math.min(13, 5.2 + sep * 0.9));
   camMid += (mid - camMid) * 0.1;
   camDist += (tgtDist - camDist) * 0.06;
-  let zoom = 0;
-  if (game.phase === 'ko' && game.winner >= 0 && game.phaseT > 90) zoom = 2.2;
+  // 通常の横からの視点
+  const d = camDist;
+  _tp.set(camMid * 0.92 + 0.8, 1.7 + d * 0.1, d);
+  _tl.set(camMid, 1.15, 0);
+
+  // 演出：対象のまわりを回り込む
+  const orbit = (cx, ang, r, h, ly) => { _tp.set(cx + Math.sin(ang) * r, h, Math.cos(ang) * r); _tl.set(cx, ly, 0); };
+  let k = 1;
+  if (camFx) {
+    const t = Math.min(1, (time - camFx.start) / camFx.dur), e = ease(t);
+    if (camFx.type === 'special') {
+      // 技を出した側の正面へ回り込み、寄る
+      const f = camFx.f;
+      orbit(f.x + f.face * 0.3, f.face * 0.85 * e, 6.5 - 3.3 * e, 1.9 - 0.4 * e, 1.35);
+      k = 0.16;
+      if (t >= 1) { camFx = null; camBlend = 40; }
+    } else if (camFx.type === 'ko') {
+      // 倒れる相手のまわりを低い位置から回り込む
+      const L = camFx.loser, W = camFx.winner;
+      const cx = (L.x * 2 + W.x) / 3;
+      orbit(cx, (-0.25 + 1.45 * e) * W.face, 7 - 2.8 * e, 2.2 - 1.3 * e, 0.9);
+      k = 0.12;
+    } else if (camFx.type === 'win') {
+      // 勝者を斜め前からゆっくり映す
+      const W = camFx.winner;
+      orbit(W.x - W.face * 0.4, W.face * (0.35 + 0.2 * t), 5.6 - 0.5 * e, 2.1, 1.3);
+      k = 0.06;
+    }
+  } else if (camBlend > 0) { camBlend--; k = 0.1; }
+  camPos.lerp(_tp, k); camLook.lerp(_tl, k);
+
   const s = game.shake;
   const sx = (Math.random() - 0.5) * s, sy = (Math.random() - 0.5) * s;
-  const d = camDist - zoom;
-  camera.position.set(camMid * 0.92 + sx + 0.8, 1.7 + d * 0.1 + sy, d);
-  camera.lookAt(camMid + sx * 0.5, 1.15 + (zoom ? 0.3 : 0), 0);
+  camera.position.set(camPos.x + sx, camPos.y + sy, camPos.z);
+  camera.lookAt(camLook.x + sx * 0.5, camLook.y, camLook.z);
   game.shake *= 0.86;
 }
 
@@ -1505,6 +1559,33 @@ function drawHUD() {
     g.lineWidth = 6; g.strokeStyle = '#1b2a0c'; g.fillStyle = '#fff';
     g.strokeText(game.sub, 480, 340); g.fillText(game.sub, 480, 340);
   }
+  // 必殺技のカットイン
+  if (game.cine > 0 && game.cineF) {
+    const p = 1 - game.cine / SPECIAL_CINE;            // 0→1
+    const inA = Math.min(1, p * 5), outA = Math.min(1, game.cine / 8);
+    const a = Math.min(inA, outA);
+    g.save();
+    g.globalAlpha = a * 0.35; g.fillStyle = '#000'; g.fillRect(0, 0, 960, 540);
+    g.globalAlpha = a;
+    const left = game.cineF.idx === 0;
+    const slide = (1 - Math.min(1, p * 4)) * 600 * (left ? -1 : 1);
+    const by = 380;
+    const band = g.createLinearGradient(0, by - 44, 0, by + 44);
+    band.addColorStop(0, 'rgba(255,190,40,0)'); band.addColorStop(0.5, 'rgba(255,170,30,.85)'); band.addColorStop(1, 'rgba(255,190,40,0)');
+    g.fillStyle = band; g.fillRect(0, by - 44, 960, 88);
+    // 集中線
+    g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2;
+    for (let i = 0; i < 26; i++) {
+      const ang = (i / 26) * Math.PI * 2 + simTime * 0.02, r0 = 330 + ((i * 37 + simTime * 9) % 60);
+      g.beginPath(); g.moveTo(480 + Math.cos(ang) * r0, 270 + Math.sin(ang) * r0 * 0.6);
+      g.lineTo(480 + Math.cos(ang) * 700, 270 + Math.sin(ang) * 420); g.stroke();
+    }
+    g.textAlign = 'center';
+    fitFont(g, T('spName'), 64, 880, '900');
+    g.lineWidth = 9; g.strokeStyle = '#3a1a00'; g.fillStyle = '#fff8d0';
+    g.strokeText(T('spName'), 480 + slide, by + 22); g.fillText(T('spName'), 480 + slide, by + 22);
+    g.restore();
+  }
   // ステージ表示
   g.font = 'bold 14px sans-serif'; g.lineWidth = 4; g.strokeStyle = '#000'; g.fillStyle = '#ffd84d';
   const st = `STAGE ${game.stage + 1} / ${ROSTER.length}`;
@@ -1573,4 +1654,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // デバッグ用
-window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS };
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER, music, SONGS, simTime: () => simTime };
