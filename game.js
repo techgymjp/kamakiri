@@ -312,7 +312,7 @@ function makeMantis(cfg) {
   const radii = [0.15, 0.2, 0.23, 0.24, 0.23, 0.2, 0.16, 0.11, 0.07];
   radii.forEach((r, i) => {
     const s = add(abdomen, new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), i % 2 ? mat : dark));
-    s.scale.set(0.2, r * 0.78, r);
+    s.scale.set(0.2, r * 0.78, r * (cfg.abdW || 1));
     s.position.set(-0.08 - i * 0.205, -i * 0.018 - (i > 6 ? (i - 6) * 0.01 : 0), 0);
   });
   for (const z of [-1, 1]) {
@@ -343,6 +343,10 @@ function makeMantis(cfg) {
   const pro = add(body, new THREE.Mesh(segGeo(0.05, 0.075, 0.85, 12), mat));
   const proRidge = add(pro, new THREE.Mesh(segGeo(0.02, 0.03, 0.7, 6), dark));
   proRidge.position.set(0.04, 0.08, 0);
+  if (cfg.shield) { // 前胸の葉状の張り出し（カレハカマキリ等）
+    const sh = add(pro, new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), dark));
+    sh.scale.set(0.05, 0.32, cfg.shield); sh.position.set(0.02, 0.38, 0);
+  }
 
   // 頭
   const head = new THREE.Group(); body.add(head);
@@ -364,6 +368,10 @@ function makeMantis(cfg) {
       new THREE.Vector3(-0.35, 1.05, s * 0.45),
     ]);
     add(head, new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.008, 5, false), dark));
+  }
+  if (cfg.crest) { // 頭の突起（ニセハナマオウカマキリ等）
+    const cr = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.06, cfg.crest, 8), dark));
+    cr.position.set(-0.02, 0.12 + cfg.crest / 2, 0); cr.scale.z = 0.5;
   }
   for (let k = -1; k <= 1; k++) {
     const oc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), black);
@@ -627,10 +635,10 @@ class KeyController {
 }
 
 class AIController {
-  constructor(diff) {
-    this.react = [24, 13, 6][diff];
-    this.guardP = [0.2, 0.5, 0.82][diff];
-    this.aggr = [0.45, 0.65, 0.85][diff];
+  constructor(level) {
+    this.react = Math.max(4, Math.round(26 - 21 * level));
+    this.guardP = Math.min(0.9, 0.12 + 0.76 * level);
+    this.aggr = 0.4 + 0.5 * level;
     this.cd = 30; this.hold = null; this.holdT = 0; this.out = {}; this.seenAtk = -1;
   }
   bind(self, opp) { this.self = self; this.opp = opp; }
@@ -654,13 +662,14 @@ class AIController {
 
     const r = Math.random();
     if (o.y > 0.3 && dist < 2.6 && r < this.aggr * 0.6) { out.heavy = true; return out; }
-    if (f.en >= 50 && dist < 3.2 && dist > 1.2 && r < 0.25 * this.aggr) { out.special = true; return out; }
-    if (dist < 1.9) {
+    const k = f.sp.scale;
+    if (f.en >= 50 && dist < 3.2 * k && dist > 1.2 && r < 0.25 * this.aggr) { out.special = true; return out; }
+    if (dist < 1.9 * k) {
       if (r < 0.45 * this.aggr + 0.15) out.light = true;
       else if (r < 0.75 * this.aggr + 0.1) out.heavy = true;
       else if (r < 0.85) { this.walk = back; this.cd = 14; }
       else { this.hold = { down: true }; this.holdT = 20; }
-    } else if (dist < 2.5) {
+    } else if (dist < 2.5 * k) {
       if (r < 0.35 * this.aggr) out.heavy = true; else { this.walk = fwd; this.cd = 10; }
     } else {
       if (r < 0.06) { out.up = true; out[fwd] = true; }
@@ -675,23 +684,90 @@ class AIController {
 window.addEventListener('keydown', e => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
-  if ((e.code === 'KeyP' || e.code === 'Escape') && game.mode === 'match' && game.phase === 'fight') game.paused = !game.paused;
-  if (e.code === 'KeyM') muted = !muted;
+  if (e.code === 'KeyP' || e.code === 'Escape') setPaused(!game.paused);
+  if (e.code === 'KeyM') toggleMute();
 });
 window.addEventListener('keyup', e => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 
-// タッチ
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-  touchEl.dataset.enabled = '1';
-  touchEl.querySelectorAll('button').forEach(b => {
-    const k = b.dataset.key;
-    const on = e => { e.preventDefault(); keys.add(k); b.classList.add('on'); audio(); };
-    const off = e => { e.preventDefault(); keys.delete(k); b.classList.remove('on'); };
-    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off);
-    b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
+// タッチ操作
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+if (isTouch) document.body.classList.add('is-touch');
+{
+  // アナログ風パッド：指を滑らせても方向が切り替わる
+  const pad = document.getElementById('pad'), knob = document.getElementById('knob');
+  const lbl = { up: pad.querySelector('.up'), down: pad.querySelector('.down'), left: pad.querySelector('.left'), right: pad.querySelector('.right') };
+  const DIR_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' };
+  let padId = null;
+  const setDirs = (d) => {
+    for (const n of Object.keys(DIR_KEYS)) {
+      if (d[n]) keys.add(DIR_KEYS[n]); else keys.delete(DIR_KEYS[n]);
+      lbl[n].classList.toggle('on', !!d[n]);
+    }
+  };
+  const padMove = (e) => {
+    const r = pad.getBoundingClientRect();
+    const R = r.width / 2;
+    let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R);
+    const len = Math.hypot(dx, dy), max = R * 0.62;
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const dz = R * 0.22;
+    setDirs({ left: dx < -dz, right: dx > dz, up: dy < -R * 0.36, down: dy > R * 0.36 });
+  };
+  const padEnd = (e) => {
+    if (e.pointerId !== padId) return;
+    padId = null; knob.style.transform = ''; setDirs({});
+  };
+  pad.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio();
+    padId = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (_) { /* 無視 */ } padMove(e);
   });
+  pad.addEventListener('pointermove', e => { if (e.pointerId === padId) { e.preventDefault(); padMove(e); } });
+  pad.addEventListener('pointerup', padEnd);
+  pad.addEventListener('pointercancel', padEnd);
+
+  // 各ボタン
+  touchEl.querySelectorAll('.btns button').forEach(b => {
+    const k = b.dataset.key;
+    const on = e => { e.preventDefault(); audio(); try { b.setPointerCapture(e.pointerId); } catch (_) { /* 無視 */ } keys.add(k); b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
+    const off = e => { e.preventDefault(); keys.delete(k); b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on);
+    b.addEventListener('pointerup', off);
+    b.addEventListener('pointercancel', off);
+  });
+  document.addEventListener('contextmenu', e => e.preventDefault());
 }
+
+// システムボタン（一時停止・音・全画面）
+const sysEl = document.getElementById('sys');
+const pauseEl = document.getElementById('pause');
+const muteBtn = document.getElementById('muteBtn');
+function toggleMute() { muted = !muted; muteBtn.classList.toggle('off', muted); }
+function setPaused(v) {
+  if (game.mode !== 'match') v = false;
+  game.paused = v;
+  pauseEl.classList.toggle('hidden', !v);
+  if (v) keys.clear();
+}
+document.getElementById('pauseBtn').addEventListener('click', () => { audio(); setPaused(!game.paused); });
+muteBtn.addEventListener('click', () => { audio(); toggleMute(); });
+const fsBtn = document.getElementById('fsBtn');
+const fsTarget = document.documentElement;
+if (!(fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen)) fsBtn.style.display = 'none';
+fsBtn.addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      await (fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen).call(fsTarget);
+      if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch (e) { /* 非対応端末は無視 */ }
+});
+document.getElementById('resumeBtn').addEventListener('click', () => { sfx.select(); setPaused(false); });
+document.getElementById('retryBtn').addEventListener('click', () => { sfx.select(); setPaused(false); startStage(game.stage); });
+document.getElementById('pauseTitleBtn').addEventListener('click', () => { sfx.select(); setPaused(false); toTitle(); });
 
 // ============================================================
 //  技データ（フレーム@60fps、距離はワールド単位）
@@ -709,20 +785,37 @@ const MOVES = {
 const STAGE_HALF = 8.2;
 const WALK_F = 0.055, WALK_B = 0.04, JUMP_V = 0.21, GRAV = 0.0115;
 
-const SPECIES = [
-  { name: 'オオカマキリ', body: 0x7cae3a, dark: 0x557f22, eye: 0xc9e88e, spike: 0x2f3b14, wingCss: 'rgb(140,190,80)', veinCss: 'rgba(60,100,30,.7)', hindCss: 'rgb(120,80,60)' },
-  { name: 'チョウセンカマキリ', body: 0x9b7646, dark: 0x6c4f2c, eye: 0xdcc58e, spike: 0x2f2414, wingCss: 'rgb(170,130,80)', veinCss: 'rgba(90,60,30,.7)', hindCss: 'rgb(90,70,90)' },
+const PLAYER_SP = { name: 'オオカマキリ', body: 0x7cae3a, dark: 0x557f22, eye: 0xc9e88e, spike: 0x2f3b14, wingCss: 'rgb(140,190,80)', veinCss: 'rgba(60,100,30,.7)', hindCss: 'rgb(120,80,60)', scale: 1, atk: 1, def: 1, spd: 1 };
+// 勝ち抜きで登場する相手（だんだん強くなる）
+const ROSTER = [
+  { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', level: 0.0, scale: 0.82, atk: 0.8, def: 0.85, spd: 1.05,
+    body: 0x8a7a5e, dark: 0x5e4f3a, eye: 0xc8b890, spike: 0x2a2418, wingCss: 'rgb(150,130,100)', veinCss: 'rgba(80,60,40,.7)', hindCss: 'rgb(100,80,60)' },
+  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', level: 0.22, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
+    body: 0x6fbf45, dark: 0x4a8f2a, eye: 0xd7f0a0, spike: 0x2a3a14, wingCss: 'rgb(120,200,80)', veinCss: 'rgba(240,250,200,.8)', hindCss: 'rgb(110,150,80)' },
+  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', level: 0.42, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
+    body: 0x9b7646, dark: 0x6c4f2c, eye: 0xdcc58e, spike: 0x2f2414, wingCss: 'rgb(170,130,80)', veinCss: 'rgba(90,60,30,.7)', hindCss: 'rgb(90,70,90)' },
+  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', level: 0.62, scale: 0.92, atk: 1.05, def: 0.95, spd: 1.25,
+    body: 0xf2d6e4, dark: 0xe0a8c4, eye: 0xf8e8a8, spike: 0x9a5a78, wingCss: 'rgb(250,225,238)', veinCss: 'rgba(220,150,190,.8)', hindCss: 'rgb(250,210,230)' },
+  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', level: 0.8, scale: 1.05, atk: 1.1, def: 1.25, spd: 0.95, shield: 0.32,
+    body: 0x8a5a30, dark: 0x5a3818, eye: 0xc89a60, spike: 0x2a180a, wingCss: 'rgb(150,100,55)', veinCss: 'rgba(70,40,15,.8)', hindCss: 'rgb(60,40,80)' },
+  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', level: 1.0, scale: 1.25, atk: 1.3, def: 1.35, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
+    body: 0x9cc068, dark: 0x5a3a6a, eye: 0xe8f0b0, spike: 0x301838, wingCss: 'rgb(170,200,120)', veinCss: 'rgba(80,40,90,.8)', hindCss: 'rgb(120,40,140)' },
 ];
+
 
 let atkCounter = 0;
 class Fighter {
-  constructor(idx) {
+  constructor(idx, sp) {
     this.idx = idx;
-    this.sp = SPECIES[idx];
-    this.name = this.sp.name;
-    this.model = makeMantis(this.sp);
+    this.setSpecies(sp);
+  }
+  setSpecies(sp) {
+    if (this.model) scene.remove(this.model.root);
+    this.sp = sp; this.name = sp.name;
+    this.model = makeMantis(sp);
+    this.model.root.scale.setScalar(sp.scale || 1);
     scene.add(this.model.root);
-    this.reset(idx === 0 ? -2.6 : 2.6, idx === 0 ? 1 : -1, true);
+    this.reset(this.idx === 0 ? -2.6 : 2.6, this.idx === 0 ? 1 : -1, true);
   }
   reset(x, face, full) {
     this.x = x; this.y = 0; this.vx = 0; this.vy = 0; this.face = face;
@@ -789,7 +882,7 @@ class Fighter {
           } else if (inp.left || inp.right) {
             const dir = inp.left ? -1 : 1;
             this.state = 'walk';
-            this.vx = dir * (dir === this.face ? WALK_F : WALK_B);
+            this.vx = dir * (dir === this.face ? WALK_F : WALK_B) * this.sp.spd;
             this.walkPhase += 0.22 * dir * this.face;
           } else { this.state = 'idle'; this.vx = 0; }
         } else if ((inp.light || inp.heavy) && !this.airUsed) {
@@ -833,60 +926,98 @@ class Fighter {
     }
     lerpPose(this.pose, tgt, k);
   }
-  hurtbox() { return [this.x - 0.6, this.x + 0.6, this.y, this.y + (this.state === 'guard' || this.state === 'block' ? 1.9 : 2.1)]; }
+  hurtbox() { const k = this.sp.scale; return [this.x - 0.6 * k, this.x + 0.6 * k, this.y, this.y + (this.state === 'guard' || this.state === 'block' ? 1.9 : 2.1) * k]; }
 }
 
 // ============================================================
 //  ゲーム進行
 // ============================================================
-const fighters = [new Fighter(0), new Fighter(1)];
+const fighters = [new Fighter(0, PLAYER_SP), new Fighter(1, ROSTER[ROSTER.length - 1])];
 const game = {
   mode: 'title', // title / match / result
-  vsCpu: true, diff: 1, phase: 'intro', phaseT: 0, round: 1, wins: [0, 0], timer: 99 * 60,
+  stage: 0, phase: 'intro', phaseT: 0, round: 1, wins: [0, 0], timer: 99 * 60,
   hitstop: 0, shake: 0, slow: 0, paused: false, msg: '', sub: '', winner: -1, sound: false,
-  ctrls: [null, null],
+  ctrls: [null, null], introLen: 0,
 };
 let camMid = 0, camDist = 9;
 
+const SAVE_KEY = 'kamakiri.stage';
+function loadProgress() { try { return Math.min(ROSTER.length - 1, Number(localStorage.getItem(SAVE_KEY)) || 0); } catch (e) { return 0; } }
+function saveProgress(n) { try { if (n > loadProgress()) localStorage.setItem(SAVE_KEY, String(n)); } catch (e) { /* 保存できない環境 */ } }
+
 function setupControllers() {
   if (game.mode === 'title') {
-    const a = new AIController(2), b = new AIController(1);
+    const a = new AIController(0.9), b = new AIController(0.7);
     a.bind(fighters[0], fighters[1]); b.bind(fighters[1], fighters[0]);
     game.ctrls = [a, b];
-  } else if (game.vsCpu) {
-    const ai = new AIController(game.diff); ai.bind(fighters[1], fighters[0]);
-    game.ctrls = [new KeyController([P1KEYS, P2KEYS]), ai];
   } else {
-    game.ctrls = [new KeyController([P1KEYS]), new KeyController([P2KEYS])];
+    const ai = new AIController(ROSTER[game.stage].level); ai.bind(fighters[1], fighters[0]);
+    game.ctrls = [new KeyController([P1KEYS, P2KEYS]), ai];
   }
 }
 
-function startMatch(vsCpu, diff) {
-  game.mode = 'match'; game.vsCpu = vsCpu; game.diff = diff; game.sound = true;
+function startStage(n) {
+  game.mode = 'match'; game.stage = n; game.sound = true;
   game.wins = [0, 0]; game.round = 1;
-  fighters.forEach(f => f.en = 0);
+  fighters[0].setSpecies(PLAYER_SP);
+  fighters[1].setSpecies(ROSTER[n]);
   setupControllers();
   startRound();
-  titleEl.classList.add('hidden'); resultEl.classList.add('hidden');
-  if (touchEl.dataset.enabled) touchEl.classList.remove('hidden');
+  titleEl.classList.add('hidden'); resultEl.classList.add('hidden'); pauseEl.classList.add('hidden');
+  sysEl.classList.remove('hidden');
+  if (isTouch) touchEl.classList.remove('hidden');
 }
 function startRound() {
   fighters[0].reset(-2.6, 1, false); fighters[1].reset(2.6, -1, false);
   game.timer = 99 * 60; game.phase = 'intro'; game.phaseT = 0; game.winner = -1; game.slow = 0; game.paused = false;
+  game.introLen = game.mode === 'match' && game.round === 1 ? 130 : 0;
+  game.sub = '';
   if (game.sound) sfx.round();
 }
 function toTitle() {
-  game.mode = 'title'; game.sound = false;
+  game.mode = 'title'; game.sound = false; game.paused = false;
   titleEl.classList.remove('hidden'); resultEl.classList.add('hidden'); touchEl.classList.add('hidden');
+  pauseEl.classList.add('hidden'); sysEl.classList.add('hidden');
+  fighters[0].setSpecies(PLAYER_SP);
+  fighters[1].setSpecies(ROSTER[Math.floor(Math.random() * ROSTER.length)]);
+  const saved = loadProgress();
+  const cont = document.getElementById('continueBtn');
+  cont.classList.toggle('hidden', saved <= 0);
+  cont.textContent = `つづきから（STAGE ${saved + 1}：${ROSTER[saved].name}）`;
   setupControllers(); startRound(); game.phase = 'fight';
 }
 
-document.querySelectorAll('#title button').forEach(b => b.addEventListener('click', () => {
-  audio(); sfx.select();
-  startMatch(b.dataset.mode === 'cpu', Number(b.dataset.diff || 1));
-}));
-document.getElementById('againBtn').addEventListener('click', () => { audio(); sfx.select(); startMatch(game.vsCpu, game.diff); });
+// 結果画面のボタン
+const againBtn = document.getElementById('againBtn');
+let againAction = null;
+function showResult(title, sub, btnLabel, action) {
+  resultText.innerHTML = title + (sub ? `<small>${sub}</small>` : '');
+  againBtn.textContent = btnLabel || '';
+  againBtn.classList.toggle('hidden', !btnLabel);
+  againAction = action;
+  resultEl.classList.remove('hidden'); touchEl.classList.add('hidden');
+}
+document.getElementById('startBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(0); });
+document.getElementById('continueBtn').addEventListener('click', () => { audio(); sfx.select(); startStage(loadProgress()); });
+againBtn.addEventListener('click', () => { audio(); sfx.select(); if (againAction) againAction(); });
 document.getElementById('titleBtn').addEventListener('click', () => { sfx.select(); toTitle(); });
+
+function finishMatch(mw) {
+  game.mode = 'result'; game.msg = ''; game.sub = '';
+  const n = game.stage;
+  if (mw === 0) {
+    if (n >= ROSTER.length - 1) {
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* 無視 */ }
+      showResult('全ステージ制覇！', `${ROSTER[n].name} を倒し、真のカマキリ王になった！`, '最初から挑戦', () => startStage(0));
+    } else {
+      saveProgress(n + 1);
+      const nx = ROSTER[n + 1];
+      showResult('STAGE CLEAR!', `次の相手：${nx.name}${nx.boss ? '（ボス）' : ''}`, '次の相手へ', () => startStage(n + 1));
+    }
+  } else {
+    showResult(mw < 0 ? '引き分け…' : 'GAME OVER', `STAGE ${n + 1}：${ROSTER[n].name}`, 'コンティニュー', () => startStage(n));
+  }
+}
 
 function checkHit(a, d) {
   if (a.state !== 'attack' || d.state === 'ko') return;
@@ -895,9 +1026,10 @@ function checkHit(a, d) {
   if (at < 0 || at >= m.active) return;
   if (m.multi) { if (at % m.multi !== 0) return; }
   else if (a.hasHit) return;
-  const x0 = a.x + a.face * m.hb[0], x1 = a.x + a.face * m.hb[1];
+  const k = a.sp.scale;
+  const x0 = a.x + a.face * m.hb[0] * k, x1 = a.x + a.face * m.hb[1] * k;
   const hx0 = Math.min(x0, x1), hx1 = Math.max(x0, x1);
-  const hy0 = a.y + m.hb[2], hy1 = a.y + m.hb[3];
+  const hy0 = a.y + m.hb[2] * k, hy1 = a.y + m.hb[3] * k;
   const [dx0, dx1, dy0, dy1] = d.hurtbox();
   if (hx1 < dx0 || hx0 > dx1 || hy1 < dy0 || hy0 > dy1) return;
   a.hasHit = true;
@@ -918,7 +1050,7 @@ function checkHit(a, d) {
     game.sound && sfx.block();
     return;
   }
-  d.hp -= m.dmg;
+  d.hp -= m.dmg * a.sp.atk / d.sp.def;
   d.flash = 10;
   d.state = 'hit'; d.stun = m.hitstun; d.move = null; d.spin = 0;
   d.vx = a.face * (last ? m.lastKb : m.kb);
@@ -942,7 +1074,7 @@ function checkHit(a, d) {
 
 function pushApart() {
   const [a, b] = fighters;
-  const dx = b.x - a.x, minD = 1.1;
+  const dx = b.x - a.x, minD = 0.55 * (a.sp.scale + b.sp.scale);
   if (Math.abs(dx) < minD && Math.abs(a.y - b.y) < 1.6 && a.state !== 'ko' && b.state !== 'ko') {
     const ov = (minD - Math.abs(dx)) / 2, s = dx >= 0 ? 1 : -1;
     a.x -= s * ov; b.x += s * ov;
@@ -977,9 +1109,18 @@ function step() {
   pushApart();
 
   if (game.phase === 'intro') {
-    game.msg = game.phaseT < 70 ? `ROUND ${game.round}` : 'FIGHT!';
-    if (game.phaseT === 70 && game.sound) sfx.round();
-    if (game.phaseT >= 110) { game.phase = 'fight'; game.msg = ''; }
+    const t = game.phaseT - game.introLen;
+    if (t < 0) {
+      const sp = ROSTER[game.stage];
+      game.msg = sp.boss ? `FINAL STAGE` : `STAGE ${game.stage + 1}`;
+      game.sub = `VS ${sp.name}　―　${sp.desc}`;
+    } else {
+      game.sub = '';
+      game.msg = t < 70 ? `ROUND ${game.round}` : 'FIGHT!';
+    }
+    if (t === 0 && game.introLen && game.sound) sfx.round();
+    if (t === 70 && game.sound) sfx.round();
+    if (t >= 110) { game.phase = 'fight'; game.msg = ''; }
   } else if (game.phase === 'fight') {
     if (game.mode === 'match') game.timer--;
     if (game.timer <= 0) {
@@ -993,18 +1134,12 @@ function step() {
       if (w >= 0) { fighters[w].state = 'win'; fighters[w].move = null; fighters[w].spin = 0; }
       if (game.mode === 'title') { game.wins = [0, 0]; startRound(); game.phase = 'fight'; return; }
       if (w >= 0) game.wins[w]++;
-      game.msg = w < 0 ? 'DRAW' : `${fighters[w].name} の勝ち`;
+      game.msg = w < 0 ? 'DRAW' : w === 0 ? 'YOU WIN!' : `${fighters[w].name} の勝ち`;
     }
     if (game.phaseT === 200) {
       if (game.wins[0] >= 2 || game.wins[1] >= 2 || game.round >= 5) {
         const mw = game.wins[0] === game.wins[1] ? -1 : game.wins[0] > game.wins[1] ? 0 : 1;
-        game.mode = 'result'; game.msg = '';
-        let txt;
-        if (mw < 0) txt = '引き分け';
-        else if (game.vsCpu) txt = mw === 0 ? 'YOU WIN!' : 'YOU LOSE…';
-        else txt = `${mw + 1}P ${fighters[mw].name} の勝利！`;
-        resultText.textContent = txt;
-        resultEl.classList.remove('hidden'); touchEl.classList.add('hidden');
+        finishMatch(mw);
       } else { game.round++; startRound(); }
     }
   }
@@ -1041,6 +1176,7 @@ function updateCamera(time) {
 // ============================================================
 //  HUD
 // ============================================================
+const spBtn = document.querySelector('#touch .b-sp');
 function drawHUD() {
   const g = hctx;
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1065,7 +1201,7 @@ function drawHUD() {
     g.font = 'bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
     g.textAlign = i === 0 ? 'left' : 'right';
     g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.7)'; g.fillStyle = '#fff';
-    const label = (game.vsCpu && i === 1 ? 'CPU ' : `${i + 1}P `) + f.name;
+    const label = (i === 1 ? '' : '1P ') + f.name;
     const nx = i === 0 ? left : left + bw;
     g.strokeText(label, nx, top + bh + 20); g.fillText(label, nx, top + bh + 20);
     // 勝利数
@@ -1076,8 +1212,9 @@ function drawHUD() {
       g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke();
     }
     // 気力ゲージ
-    const ew = 220, eh = 12, ey = 540 - 34;
-    const ex = i === 0 ? 40 : 960 - 40 - ew;
+    // タッチ端末ではボタンに隠れないよう体力バーの下に表示
+    const ew = isTouch ? 160 : 220, eh = isTouch ? 8 : 12, ey = isTouch ? top + bh + 44 : 540 - 34;
+    const ex = i === 0 ? (isTouch ? 40 + 70 : 40) : 960 - 40 - ew - (isTouch ? 70 : 0);
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(ex - 2, ey - 2, ew + 4, eh + 4);
     const full = f.en >= 50;
     g.fillStyle = full ? (Math.floor(simTime / 6) % 2 ? '#ffe36a' : '#ffb020') : '#4aa8ff';
@@ -1113,11 +1250,17 @@ function drawHUD() {
     g.fillStyle = grd;
     g.strokeText(game.msg, 480, 290); g.fillText(game.msg, 480, 290);
   }
-  if (game.paused) {
-    g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, 0, 960, 540);
-    g.font = 'bold 56px sans-serif'; g.fillStyle = '#fff'; g.fillText('PAUSE', 480, 280);
-    g.font = '18px sans-serif'; g.fillText('P / Esc で再開', 480, 320);
+  if (game.sub) {
+    g.font = 'bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    g.lineWidth = 6; g.strokeStyle = '#1b2a0c'; g.fillStyle = '#fff';
+    g.strokeText(game.sub, 480, 340); g.fillText(game.sub, 480, 340);
   }
+  // ステージ表示
+  g.font = 'bold 14px sans-serif'; g.lineWidth = 4; g.strokeStyle = '#000'; g.fillStyle = '#ffd84d';
+  const st = `STAGE ${game.stage + 1} / ${ROSTER.length}`;
+  g.strokeText(st, 480, 76); g.fillText(st, 480, 76);
+  // 必殺ボタンの点灯
+  if (spBtn) spBtn.classList.toggle('ready', fighters[0].en >= MOVES.special.cost);
 }
 
 // ============================================================
@@ -1137,4 +1280,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // デバッグ用
-window.__kamakiri = { game, fighters, startMatch, MOVES };
+window.__kamakiri = { game, fighters, startStage, MOVES, ROSTER };

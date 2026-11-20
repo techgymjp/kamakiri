@@ -11,6 +11,12 @@
     <div id="stage">
       <canvas id="gl"></canvas>
       <canvas id="hud"></canvas>
+      <!-- システムボタン -->
+      <div id="sys" class="hidden">
+        <button id="pauseBtn" aria-label="一時停止">Ⅱ</button>
+        <button id="muteBtn" aria-label="音のオン/オフ">♪</button>
+        <button id="fsBtn" aria-label="全画面">⛶</button>
+      </div>
     </div>
 
     <!-- タイトル -->
@@ -18,26 +24,36 @@
       <h1>格闘<span>カマキリ</span></h1>
       <p class="sub">KAKUTO KAMAKIRI — 3D</p>
       <div class="menu">
-        <button data-mode="cpu" data-diff="0">1P VS CPU（よわい）</button>
-        <button data-mode="cpu" data-diff="1" class="primary">1P VS CPU（ふつう）</button>
-        <button data-mode="cpu" data-diff="2">1P VS CPU（つよい）</button>
-        <button data-mode="2p">2P 対戦（1台で）</button>
+        <button id="startBtn" class="primary">勝ち抜きバトル スタート</button>
+        <button id="continueBtn" class="hidden">つづきから</button>
       </div>
-      <div class="howto">
+      <p class="lead">6匹のカマキリが順番に登場。勝つほど相手が強くなる！</p>
+      <div class="howto keyboard-only">
         <table>
-          <tr><th></th><th>1P</th><th>2P</th></tr>
-          <tr><td>移動</td><td>A / D</td><td>← / →</td></tr>
-          <tr><td>ジャンプ</td><td>W</td><td>↑</td></tr>
-          <tr><td>ガード</td><td>S</td><td>↓</td></tr>
-          <tr><td>カマジャブ（弱）</td><td>J</td><td>1 / ,</td></tr>
-          <tr><td>大鎌斬り（強）</td><td>K</td><td>2 / .</td></tr>
-          <tr><td>旋風鎌（必殺）</td><td>L</td><td>3 / /</td></tr>
+          <tr><td>移動</td><td>A / D（← / →）</td></tr>
+          <tr><td>ジャンプ</td><td>W（↑）</td></tr>
+          <tr><td>ガード</td><td>S（↓）</td></tr>
+          <tr><td>カマジャブ（弱）</td><td>J</td></tr>
+          <tr><td>大鎌斬り（強）</td><td>K</td></tr>
+          <tr><td>旋風鎌（必殺）</td><td>L</td></tr>
         </table>
-        <p>空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止。</p>
+        <p>空中で攻撃すると「急降下鎌」。必殺技は気力ゲージを50使います。P / Esc で一時停止、M で消音。</p>
+      </div>
+      <div class="howto touch-only">
+        <p>左のパッドで移動（上下にずらすとジャンプ／ガード）、右のボタンで攻撃。<br>空中で「弱」「強」を押すと急降下鎌。「必」は気力ゲージ50で発動。<br>横向き画面がおすすめです。</p>
       </div>
     </div>
 
     <!-- 結果 -->
+    <div id="pause" class="overlay hidden">
+      <h2>PAUSE</h2>
+      <div class="menu">
+        <button id="resumeBtn" class="primary">再開</button>
+        <button id="retryBtn">最初からやり直す</button>
+        <button id="pauseTitleBtn">タイトルへ</button>
+      </div>
+    </div>
+
     <div id="result" class="overlay hidden">
       <h2 id="resultText"></h2>
       <div class="menu">
@@ -46,20 +62,24 @@
       </div>
     </div>
 
-    <!-- タッチ操作 -->
+    <!-- タッチ操作（スマホ） -->
     <div id="touch" class="hidden">
-      <div class="pad">
-        <button data-key="KeyW" class="up">▲</button>
-        <button data-key="KeyA" class="left">◀</button>
-        <button data-key="KeyS" class="down">守</button>
-        <button data-key="KeyD" class="right">▶</button>
+      <div id="pad">
+        <span class="lbl up">ジャンプ</span>
+        <span class="lbl left">◀</span>
+        <span class="lbl right">▶</span>
+        <span class="lbl down">ガード</span>
+        <div id="knob"></div>
       </div>
       <div class="btns">
-        <button data-key="KeyJ">弱</button>
-        <button data-key="KeyK">強</button>
-        <button data-key="KeyL" class="sp">必</button>
+        <button data-key="KeyW" class="b-jump">ジャンプ</button>
+        <button data-key="KeyS" class="b-guard">ガード</button>
+        <button data-key="KeyJ" class="b-light">弱<small>カマジャブ</small></button>
+        <button data-key="KeyK" class="b-heavy">強<small>大鎌斬り</small></button>
+        <button data-key="KeyL" class="b-sp">必<small>旋風鎌</small></button>
       </div>
     </div>
+
   </div>
   <script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
   <script type="module" src="game.js"></script>

@@ -56,29 +56,99 @@ h2 {
 .howto p { max-width: 520px; margin: 8px auto 0; }
 
 /* タッチ操作 */
+body { -webkit-touch-callout: none; }
+.touch-only { display: none; }
+body.is-touch .touch-only { display: block; }
+body.is-touch .keyboard-only { display: none; }
+
 #touch {
   position: absolute; left: 0; right: 0; bottom: 0;
   display: flex; justify-content: space-between; align-items: flex-end;
-  padding: 12px 16px; pointer-events: none;
+  padding: 0 max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  pointer-events: none;
+  z-index: 5;
 }
-#touch button {
-  pointer-events: auto;
-  width: 60px; height: 60px; border-radius: 50%;
-  border: 2px solid rgba(166, 255, 77, .7);
-  background: rgba(30, 50, 15, .55); color: #fff;
-  font-size: 20px; font-weight: bold;
-  touch-action: none;
+#pad {
+  --s: 150px;
+  position: relative; width: var(--s); height: var(--s); flex-shrink: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(30,50,15,.35) 0 40%, rgba(30,50,15,.55) 41%);
+  border: 2px solid rgba(166,255,77,.55);
+  pointer-events: auto; touch-action: none;
 }
-#touch button.on { background: rgba(120, 200, 50, .7); }
-#touch .pad { display: grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px; gap: 6px; }
-#touch .pad .up { grid-column: 2; grid-row: 1; }
-#touch .pad .left { grid-column: 1; grid-row: 2; }
-#touch .pad .down { grid-column: 2; grid-row: 2; }
-#touch .pad .right { grid-column: 3; grid-row: 2; }
-#touch .btns { display: flex; gap: 10px; }
-#touch .btns .sp { border-color: #ffcf4d; }
-@media (max-height: 420px) {
-  .howto { display: none; }
-  #touch button { width: 50px; height: 50px; }
-  #touch .pad { grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px; }
+#pad .lbl {
+  position: absolute; color: rgba(255,255,255,.85); font-size: 12px; font-weight: bold;
+  text-shadow: 0 1px 2px #000; pointer-events: none;
 }
+#pad .up { top: 6px; left: 50%; transform: translateX(-50%); }
+#pad .down { bottom: 6px; left: 50%; transform: translateX(-50%); }
+#pad .left { left: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; }
+#pad .right { right: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; }
+#pad .lbl.on { color: #ffe36a; }
+#knob {
+  position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
+  border-radius: 50%; background: rgba(166,255,77,.6); border: 2px solid rgba(255,255,255,.7);
+  pointer-events: none; transition: transform .05s;
+}
+#touch .btns {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(3, 66px);
+  grid-template-rows: 40px 66px 66px;
+  grid-template-areas: "jump guard ." ". heavy sp" "light . sp";
+  pointer-events: none;
+}
+#touch .btns button {
+  pointer-events: auto; touch-action: none;
+  border-radius: 50%;
+  border: 2px solid rgba(166,255,77,.75);
+  background: rgba(30,50,15,.6); color: #fff;
+  font: inherit; font-size: 22px; font-weight: 900; line-height: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0;
+}
+#touch .btns button small { font-size: 9px; font-weight: bold; margin-top: 2px; opacity: .85; }
+#touch .btns button.on { background: rgba(140,220,60,.8); transform: scale(.94); }
+#touch .b-jump { grid-area: jump; border-radius: 22px !important; font-size: 12px !important; white-space: nowrap; }
+#touch .b-guard { grid-area: guard; border-radius: 22px !important; font-size: 12px !important; white-space: nowrap; border-color: rgba(120,190,255,.8) !important; }
+#touch .b-light { grid-area: light; }
+#touch .b-heavy { grid-area: heavy; }
+#touch .b-sp { grid-area: sp; align-self: center; width: 66px; height: 66px; border-color: #ffcf4d !important; font-size: 24px !important; }
+#touch .b-sp.ready { background: rgba(255,170,30,.75); box-shadow: 0 0 14px #ffcf4d; }
+
+#sys {
+  position: absolute; top: 16%; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 6;
+}
+#sys button {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.6); background: rgba(0,0,0,.45); color: #fff;
+  font-size: 16px; font-weight: bold; cursor: pointer; padding: 0;
+}
+#sys button.off { opacity: .45; text-decoration: line-through; }
+
+/* 縦画面：ゲーム画面を上に寄せ、操作は下の空きスペースへ */
+@media (orientation: portrait) {
+  body.is-touch #wrap { align-items: flex-start; padding-top: 64px; }
+  #sys { top: -54px; }
+  #pad { --s: 140px; }
+  #touch { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+  #touch .btns { grid-template-columns: repeat(3, 62px); grid-template-rows: 40px 62px 62px; gap: 6px; }
+  #touch .b-sp { width: 62px; height: 62px; }
+}
+/* 横画面の小さい端末 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .howto { font-size: 12px; }
+  .keyboard-only { display: none; }
+  #pad { --s: 130px; }
+  #knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  #touch .btns { grid-template-columns: repeat(3, 58px); grid-template-rows: 34px 58px 58px; gap: 6px; }
+  #touch .b-sp { width: 58px; height: 58px; }
+  #touch .btns button { opacity: .9; }
+  #sys button { width: 34px; height: 34px; font-size: 14px; }
+  .menu button { padding: 8px 14px; font-size: 16px; }
+  h1 { font-size: 44px; }
+  .sub { margin-bottom: 10px; }
+}
+
+h2 small { display: block; font-size: clamp(14px, 2.6vw, 22px); margin-top: 12px; color: #e4f5c8; text-shadow: 0 2px 0 #000; }
+.lead { margin: 14px 0 0; color: #e4f5c8; font-size: 14px; text-shadow: 0 1px 2px #000; }
