@@ -1165,17 +1165,17 @@ const WALK_F = 0.055, WALK_B = 0.04, JUMP_V = 0.21, GRAV = 0.0115;
 const PLAYER_SP = { name: 'オオカマキリ', en: 'Japanese Giant Mantis', body: 0x7cae3a, dark: 0x557f22, eye: 0xc9e88e, spike: 0x2f3b14, wingCss: 'rgb(140,190,80)', veinCss: 'rgba(60,100,30,.7)', hindCss: 'rgb(120,80,60)', scale: 1, atk: 1, def: 1, spd: 1 };
 // 勝ち抜きで登場する相手（だんだん強くなる）
 const ROSTER = [
-  { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', en: "Small Brown Mantis", descEn: 'Tiny but nimble, a ninja of the grass', level: 0.0, scale: 0.82, atk: 0.8, def: 0.85, spd: 1.05,
+  { name: 'コカマキリ', desc: '小柄だが すばしっこい 草むらの忍者', en: "Small Brown Mantis", descEn: 'Tiny but nimble, a ninja of the grass', level: 0.45, scale: 0.82, atk: 1.0, def: 1.0, spd: 1.05,
     body: 0x8a7a5e, dark: 0x5e4f3a, eye: 0xc8b890, spike: 0x2a2418, wingCss: 'rgb(150,130,100)', veinCss: 'rgba(80,60,40,.7)', hindCss: 'rgb(100,80,60)' },
-  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', en: "Broad-bellied Mantis", descEn: 'A treetop hunter with a wide belly', level: 0.25, scale: 0.92, atk: 0.9, def: 0.95, spd: 1.0, abdW: 1.4,
+  { name: 'ハラビロカマキリ', desc: '幅広の腹を持つ 木の上の狩人', en: "Broad-bellied Mantis", descEn: 'A treetop hunter with a wide belly', level: 0.52, scale: 0.92, atk: 1.0, def: 1.0, spd: 1.0, abdW: 1.4,
     body: 0x6fbf45, dark: 0x4a8f2a, eye: 0xd7f0a0, spike: 0x2a3a14, wingCss: 'rgb(120,200,80)', veinCss: 'rgba(240,250,200,.8)', hindCss: 'rgb(110,150,80)' },
-  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', en: "Narrow-winged Mantis", descEn: 'Scythe master who rules the meadow', level: 0.45, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
+  { name: 'チョウセンカマキリ', desc: '草原を支配する 鎌の使い手', en: "Narrow-winged Mantis", descEn: 'Scythe master who rules the meadow', level: 0.6, scale: 1.0, atk: 1.0, def: 1.0, spd: 1.0,
     body: 0x9b7646, dark: 0x6c4f2c, eye: 0xdcc58e, spike: 0x2f2414, wingCss: 'rgb(170,130,80)', veinCss: 'rgba(90,60,30,.7)', hindCss: 'rgb(90,70,90)' },
-  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', en: "Orchid Mantis", descEn: 'A beautiful assassin disguised as a flower', level: 0.6, scale: 0.92, atk: 1.1, def: 1.05, spd: 1.25,
+  { name: 'ハナカマキリ', desc: '花に化けて 獲物を待つ 美しき刺客', en: "Orchid Mantis", descEn: 'A beautiful assassin disguised as a flower', level: 0.68, scale: 0.92, atk: 1.1, def: 1.05, spd: 1.25,
     body: 0xf2d6e4, dark: 0xe0a8c4, eye: 0xf8e8a8, spike: 0x9a5a78, wingCss: 'rgb(250,225,238)', veinCss: 'rgba(220,150,190,.8)', hindCss: 'rgb(250,210,230)' },
-  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', en: "Dead Leaf Mantis", descEn: 'A defensive master camouflaged as a dead leaf', level: 0.7, scale: 1.05, atk: 1.1, def: 1.05, spd: 0.95, shield: 0.32,
+  { name: 'カレハカマキリ', desc: '枯れ葉に擬態する 守りの達人', en: "Dead Leaf Mantis", descEn: 'A defensive master camouflaged as a dead leaf', level: 0.76, scale: 1.05, atk: 1.1, def: 1.05, spd: 0.95, shield: 0.32,
     body: 0x8a5a30, dark: 0x5a3818, eye: 0xc89a60, spike: 0x2a180a, wingCss: 'rgb(150,100,55)', veinCss: 'rgba(70,40,15,.8)', hindCss: 'rgb(60,40,80)' },
-  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', en: "Devil's Flower Mantis", descEn: 'The mightiest mantis of all', level: 0.82, scale: 1.25, atk: 1.05, def: 1.05, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
+  { name: 'ニセハナマオウカマキリ', desc: '悪魔の花と呼ばれる 最強のカマキリ', en: "Devil's Flower Mantis", descEn: 'The mightiest mantis of all', level: 0.86, scale: 1.25, atk: 1.05, def: 1.05, spd: 1.08, crest: 0.32, shield: 0.18, boss: true,
     body: 0x9cc068, dark: 0x5a3a6a, eye: 0xe8f0b0, spike: 0x301838, wingCss: 'rgb(170,200,120)', veinCss: 'rgba(80,40,90,.8)', hindCss: 'rgb(120,40,140)' },
 ];
 
