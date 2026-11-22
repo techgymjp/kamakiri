@@ -193,3 +193,13 @@ h2 small { display: block; font-size: clamp(14px, 2.6vw, 22px); margin-top: 12px
 .overlay.ad-wait { pointer-events: none; }
 .load { margin: -8px 0 10px; color: #cfe3b8; font-size: 13px; min-height: 1em; }
 .menu button:disabled { opacity: .5; cursor: wait; transform: none; }
+/* Web 版だけの Google Play へのリンク（アプリ用のビルドでは HTML ごと取り除く） */
+.store-link {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+  padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: bold;
+  color: #fff; text-decoration: none; background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.6);
+}
+.store-link:hover { background: rgba(60,90,30,.75); }
+.store-link .gp { color: #a6ff4d; font-size: 12px; }
+html[lang="en"] .store-link .l-ja, html:not([lang="en"]) .store-link .l-en { display: none; }
+@media (orientation: landscape) and (max-height: 500px) { .store-link { margin-top: 8px; padding: 6px 14px; font-size: 13px; } }
